@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Folder Include="Media\"/>
+        <Folder Include="Messaging\"/>
+        <Folder Include="Notifications\"/>
+        <Folder Include="Posts\"/>
+        <Folder Include="Tags\"/>
+        <Folder Include="Users\"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="ErrorOr" Version="2.1.1"/>
+        <PackageReference Include="MediatR" Version="14.1.0"/>
+        <PackageReference Include="Ulid" Version="1.4.1"/>
+    </ItemGroup>
+
+</Project>

@@ -377,3 +377,12 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+
+# Environment
+**/*/appsettings.Development.json
+# Optional extras
+**/appsettings.Local.json
+**/appsettings.*.local.json
+.env
+.env.*
+*.pfx

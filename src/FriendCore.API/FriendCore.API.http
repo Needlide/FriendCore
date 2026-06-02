@@ -1,0 +1,33 @@
+@HostAddress = http://localhost:5024
+
+GET {{HostAddress}}/
+Accept: application/json
+
+###
+
+GET {{HostAddress}}/health
+Accept: application/json
+
+###
+
+POST {{HostAddress}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "needlide",
+  "displayName": "Needlide",
+  "email": "dev@friendcore.local",
+  "password": "ChangeMe123!"
+}
+
+###
+
+POST {{HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "dev@friendcore.local",
+  "password": "ChangeMe123!"
+}
+
+###
