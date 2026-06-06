@@ -18,6 +18,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\FriendCore.Application\FriendCore.Application.csproj"/>
         <ProjectReference Include="..\..\src\FriendCore.Domain\FriendCore.Domain.csproj"/>
+        <ProjectReference Include="..\..\src\FriendCore.Infrastructure\FriendCore.Infrastructure.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
