@@ -1,21 +1,37 @@
 name: CI
 
+# §21.2 build order:
+#   push to develop  -> unit + architecture tests + build -> deploy staging
+#   merge to main    -> all tests (incl. integration) + build -> deploy production
+# Pull requests run the same checks as their target branch so nothing merges red.
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
+jobs:
+  # Fast feedback: runs on every push/PR to either branch. No Docker.
+  build-and-test:
+    name: Build & fast tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore
         run: dotnet restore
@@ -23,5 +39,80 @@ jobs:
       - name: Build
         run: dotnet build --no-restore -c Release
 
-      - name: Test
-        run: dotnet test --no-build -c Release --verbosity normal
+      # Architecture tests first — a layering violation should fail loud and cheap (§21.3).
+      - name: Architecture tests
+        run: dotnet test tests/FriendCore.ArchitectureTests --no-build -c Release --logger "trx;LogFileName=architecture.trx"
+
+      - name: Unit tests
+        run: dotnet test tests/FriendCore.UnitTests --no-build -c Release --logger "trx;LogFileName=unit.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-test-results
+          path: '**/*.trx'
+
+  # Integration tests need a Docker daemon (Testcontainers spins up PostgreSQL).
+  # ubuntu-latest provides one. Per §21.2 these gate main only: runs on push to main
+  # and on PRs targeting main.
+  integration-tests:
+    name: Integration tests (Testcontainers)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Integration tests
+        run: dotnet test tests/FriendCore.IntegrationTests --no-build -c Release --logger "trx;LogFileName=integration.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: '**/*.trx'
+
+  # ---------------------------------------------------------------------------
+  # Deploy stages. These are PLACEHOLDERS: no infrastructure or secrets exist
+  # yet (§14.4 calls for an AWS EC2 target + Resend/R2/RDS). The `environment:`
+  # keys let you attach protection rules, approvals, and secrets in GitHub
+  # later. Replace the echo steps with the real deploy when infra is ready.
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Placeholder
+        run: echo "TODO: build container, push to registry, deploy to staging."
+
+  deploy-production:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: [build-and-test, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Placeholder
+        run: echo "TODO: build container, push to registry, deploy to production."
