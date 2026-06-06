@@ -106,3 +106,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Exposes the implicit Program class to WebApplicationFactory<Program> for integration tests.
+public partial class Program;

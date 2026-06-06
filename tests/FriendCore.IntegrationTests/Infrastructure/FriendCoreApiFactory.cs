@@ -1,0 +1,96 @@
+using System.Threading.RateLimiting;
+using FriendCore.API.Extensions;
+using FriendCore.Application.Common.Interfaces;
+using FriendCore.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Testcontainers.PostgreSql;
+
+namespace FriendCore.IntegrationTests.Infrastructure;
+
+public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+{
+    private const string JwtSecret = "integration-tests-secret-key-that-is-long-enough-32+";
+    private const string JwtIssuer = "FriendCore.Tests";
+    private const string JwtAudience = "FriendCore.Tests";
+
+    private readonly PostgreSqlContainer _database = new PostgreSqlBuilder()
+        .WithImage("postgres:16-alpine")
+        .Build();
+
+    public FriendCoreApiFactory()
+    {
+        // Program reads the Jwt section at top-level (to build the bearer validation parameters)
+        // before ConfigureAppConfiguration runs, so these must be present as env vars — which
+        // WebApplication.CreateBuilder picks up at builder-creation time — or the validator and the
+        // token service end up with different secrets and every authenticated request 401s.
+        Environment.SetEnvironmentVariable("Jwt__SecretKey", JwtSecret);
+        Environment.SetEnvironmentVariable("Jwt__Issuer", JwtIssuer);
+        Environment.SetEnvironmentVariable("Jwt__Audience", JwtAudience);
+    }
+
+    public CapturingEmailService Emails { get; } = new();
+
+    public MutableDateTimeProvider Clock { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Database"] = _database.GetConnectionString(),
+                ["Jwt:SecretKey"] = JwtSecret,
+                ["Jwt:Issuer"] = JwtIssuer,
+                ["Jwt:Audience"] = JwtAudience,
+                ["Jwt:AccessTokenExpirationMinutes"] = "60"
+            });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            // Capture emails instead of hitting Resend — this is how the raw token is recovered.
+            services.RemoveAll<IEmailService>();
+            services.AddSingleton<IEmailService>(Emails);
+
+            // Controllable clock for expiry tests.
+            services.RemoveAll<IDateTimeProvider>();
+            services.AddSingleton<IDateTimeProvider>(Clock);
+
+            // The test server gives every request the same partition key, so the real 10/min auth
+            // limit would trip across tests. Replace the policy config with no-op limiters (the
+            // rate-limiter core services stay registered from Program's AddApiRateLimiting call).
+            services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
+            services.Configure<RateLimiterOptions>(options =>
+            {
+                options.AddPolicy(RateLimitingExtensions.AuthPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
+                options.AddPolicy(RateLimitingExtensions.ApiPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
+            });
+        });
+    }
+
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await _database.StartAsync();
+
+        // Accessing Services builds the host (running ConfigureWebHost above) so migrations target
+        // the container.
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    }
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await _database.DisposeAsync();
+        await base.DisposeAsync();
+    }
+}
