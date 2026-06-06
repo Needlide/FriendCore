@@ -5,6 +5,8 @@ namespace FriendCore.API.Extensions;
 
 public static class ErrorOrExtensions
 {
+    public static IActionResult FromErrors(List<Error> errors) => ToErrorActionResult(errors);
+
     private static ActionResult ToErrorActionResult(List<Error> errors)
     {
         return errors.First().Type switch

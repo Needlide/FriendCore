@@ -15,4 +15,20 @@ public sealed class UserProfile
     {
         return new UserProfile();
     }
+
+    internal void Update(string? bio, string? websiteUrl, string? location)
+    {
+        Bio = NormalizeOptional(bio);
+        WebsiteUrl = NormalizeOptional(websiteUrl);
+        Location = NormalizeOptional(location);
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        if (value is null)
+            return null;
+
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 ? null : trimmed;
+    }
 }

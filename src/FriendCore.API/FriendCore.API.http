@@ -22,6 +22,7 @@ Content-Type: application/json
 
 ###
 
+# @name login
 POST {{HostAddress}}/api/v1/auth/login
 Content-Type: application/json
 
@@ -29,5 +30,39 @@ Content-Type: application/json
   "email": "dev@friendcore.local",
   "password": "ChangeMe123!"
 }
+
+###
+
+@token = {{login.response.body.accessToken}}
+
+###
+
+GET {{HostAddress}}/api/v1/users/needlide
+Accept: application/json
+
+###
+
+PATCH {{HostAddress}}/api/v1/users/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bio": "Building FriendCore.",
+  "location": "Ukraine"
+}
+
+###
+
+POST {{HostAddress}}/api/v1/auth/verify-email
+Content-Type: application/json
+
+{
+  "token": "PASTE_TOKEN_FROM_LOGS"
+}
+
+###
+
+POST {{HostAddress}}/api/v1/auth/resend-verification
+Authorization: Bearer {{token}}
 
 ###

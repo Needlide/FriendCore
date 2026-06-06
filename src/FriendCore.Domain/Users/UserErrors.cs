@@ -25,4 +25,16 @@ public static class UserErrors
 
     public static Error InvalidEmail =>
         Error.Validation("User.InvalidEmail", "A valid email address is required.");
+
+    public static Error NotFound =>
+        Error.NotFound("User.NotFound", "User was not found.");
+
+    public static Error EmailAlreadyVerified =>
+        Error.Conflict("User.EmailAlreadyVerified", "Email is already verified.");
+
+    public static Error EmailNotVerified =>
+        Error.Validation("User.EmailNotVerified", "Please verify your email before continuing.");
+
+    public static Error InvalidVerificationToken =>
+        Error.Validation("User.InvalidVerificationToken", "Verification link is invalid or has expired.");
 }

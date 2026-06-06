@@ -33,6 +33,7 @@ internal sealed class LoginUserCommandHandler(
             token.ExpiresAt,
             user.Id.ToString(),
             user.Username,
-            user.DisplayName);
+            user.DisplayName,
+            user.IsVerified);
     }
 }

@@ -5,4 +5,5 @@ public sealed record AuthResponse(
     DateTimeOffset ExpiresAt,
     string UserId,
     string Username,
-    string DisplayName);
+    string DisplayName,
+    bool IsEmailVerified);

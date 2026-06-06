@@ -62,8 +62,44 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
             LastActiveAt = createdAt
         };
 
-        user.RaiseDomainEvent(new UserRegisteredEvent(user.Id, user.Email, createdAt));
+        user.RaiseDomainEvent(new UserRegisteredEvent(
+            user.Id,
+            user.Email,
+            user.DisplayName,
+            user.Username,
+            createdAt));
         return user;
+    }
+
+    public ErrorOr<Success> UpdateProfile(
+        string? displayName,
+        string? bio,
+        string? websiteUrl,
+        string? location,
+        DateTimeOffset updatedAt)
+    {
+        if (displayName is not null)
+        {
+            var trimmed = displayName.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Length > 100)
+                return Error.Validation("User.InvalidDisplayName", "Display name must be 1–100 characters.");
+
+            DisplayName = trimmed;
+        }
+
+        Profile.Update(bio, websiteUrl, location);
+        UpdatedAt = updatedAt;
+        return Result.Success;
+    }
+
+    public ErrorOr<Success> MarkEmailVerified(DateTimeOffset verifiedAt)
+    {
+        if (IsVerified)
+            return UserErrors.EmailAlreadyVerified;
+
+        IsVerified = true;
+        UpdatedAt = verifiedAt;
+        return Result.Success;
     }
 
     public void RecordLogin(DateTimeOffset at)

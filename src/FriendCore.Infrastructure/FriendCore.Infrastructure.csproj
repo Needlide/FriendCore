@@ -7,6 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\FriendCore.Application\FriendCore.Application.csproj"/>
         <ProjectReference Include="..\FriendCore.Domain\FriendCore.Domain.csproj"/>
     </ItemGroup>

@@ -1,7 +1,9 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Options;
 using FriendCore.Domain.Users;
 using FriendCore.Infrastructure.Authentication;
 using FriendCore.Infrastructure.Common;
+using FriendCore.Infrastructure.Email;
 using FriendCore.Infrastructure.Persistence;
 using FriendCore.Infrastructure.Persistence.Interceptors;
 using FriendCore.Infrastructure.Persistence.Repositories;
@@ -18,8 +20,15 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+        services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
+        services.AddSingleton<IEmailVerificationTokenHasher, EmailVerificationTokenHasher>();
+        services.AddHttpClient<IEmailService, ResendEmailService>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
