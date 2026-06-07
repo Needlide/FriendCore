@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Infrastructure.Caching;
 using FriendCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -65,6 +66,11 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
             // Controllable clock for expiry tests.
             services.RemoveAll<IDateTimeProvider>();
             services.AddSingleton<IDateTimeProvider>(Clock);
+
+            // No Redis in the test environment: use the no-op cache so cached paths
+            // (e.g. tag autocomplete) fall through to the database.
+            services.RemoveAll<ICacheService>();
+            services.AddSingleton<ICacheService, NullCacheService>();
 
             // The test server gives every request the same partition key, so the real 10/min auth
             // limit would trip across tests. Replace the policy config with no-op limiters (the
