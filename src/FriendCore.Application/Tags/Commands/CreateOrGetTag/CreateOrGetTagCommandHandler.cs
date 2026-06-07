@@ -24,7 +24,7 @@ internal sealed class CreateOrGetTagCommandHandler(
         if (normalized.IsError)
             return normalized.Errors;
 
-        var existing = await tagRepository.GetBySlugAsync(normalized.Value.Slug, cancellationToken);
+        var existing = await tagRepository.GetBySlugResolvingAliasAsync(normalized.Value.Slug, cancellationToken);
         if (existing is not null)
             return TagResponse.FromTag(existing);
 

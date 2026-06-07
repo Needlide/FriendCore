@@ -4,6 +4,9 @@ public interface ITagRepository
 {
     Task<Tag?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
 
+    // Resolves an alias: if the slug maps to a Merged tag, returns its merge target instead.
+    Task<Tag?> GetBySlugResolvingAliasAsync(string slug, CancellationToken cancellationToken = default);
+
     Task<Tag?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Tag>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids,

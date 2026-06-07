@@ -42,6 +42,15 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         return await context.Users.Where(user => ids.Contains(user.Id)).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(
+        Ulid tagId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Users
+            .Where(user => user.ProfileTags.Any(tag => tag.TagId == tagId))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default)
     {
         await context.Users.AddAsync(user, cancellationToken);

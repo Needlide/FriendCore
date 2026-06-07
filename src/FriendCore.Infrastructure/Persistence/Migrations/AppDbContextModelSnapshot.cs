@@ -41,6 +41,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
 
+                    b.Property<string>("MergedIntoId")
+                        .HasColumnType("text")
+                        .HasColumnName("merged_into_id");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

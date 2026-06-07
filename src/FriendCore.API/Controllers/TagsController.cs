@@ -3,6 +3,7 @@ using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.ArchiveStaleTags;
 using FriendCore.Application.Tags.Commands.CreateOrGetTag;
+using FriendCore.Application.Tags.Commands.MergeTags;
 using FriendCore.Application.Tags.Commands.ModerateTag;
 using FriendCore.Application.Tags.Queries.GetTagAutocomplete;
 using FriendCore.Application.Tags.Queries.GetTagDetails;
@@ -89,6 +90,25 @@ public sealed class TagsController(ISender sender) : ControllerBase
     public async Task<IActionResult> AutoArchiveStaleTags(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new ArchiveStaleTagsCommand(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPost("{id}/merge")]
+    [Authorize(Policy = AuthorizationPolicies.TagMerge)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Merge(
+        string id,
+        [FromBody] MergeTagRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var sourceId) || !Ulid.TryParse(request.TargetTagId, out var targetId))
+            return NotFound();
+
+        var result = await sender.Send(new MergeTagsCommand(sourceId, targetId), cancellationToken);
         return result.ToActionResult();
     }
 }

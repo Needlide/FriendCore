@@ -88,7 +88,7 @@ public class UpdateProfileTagsCommandHandlerTests
     public async Task Handle_ReusesExistingTagBySlug_AndIncrementsCount()
     {
         var existing = Tag.Create("Photography", "photography", Ulid.NewUlid(), Now);
-        _tagRepository.GetBySlugAsync("photography", Arg.Any<CancellationToken>()).Returns(existing);
+        _tagRepository.GetBySlugResolvingAliasAsync("photography", Arg.Any<CancellationToken>()).Returns(existing);
 
         var result = await CreateHandler().Handle(
             Command(new ProfileTagInput("photography", TagTier.Primary, true)),

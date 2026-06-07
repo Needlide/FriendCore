@@ -62,6 +62,7 @@ internal sealed class UpdateProfileTagsCommandHandler(
     {
         var assignments = new List<TagAssignment>(inputs.Count);
         var seenSlugs = new HashSet<string>();
+        var seenTagIds = new HashSet<Ulid>();
 
         foreach (var input in inputs)
         {
@@ -72,7 +73,8 @@ internal sealed class UpdateProfileTagsCommandHandler(
             if (!seenSlugs.Add(normalized.Value.Slug))
                 return TagErrors.Duplicate;
 
-            var tag = await tagRepository.GetBySlugAsync(normalized.Value.Slug, cancellationToken);
+            // Follows aliases so a merged tag's old name resolves to its target.
+            var tag = await tagRepository.GetBySlugResolvingAliasAsync(normalized.Value.Slug, cancellationToken);
             if (tag is null)
             {
                 tag = Tag.Create(normalized.Value.DisplayName, normalized.Value.Slug, userId, now);
@@ -81,6 +83,10 @@ internal sealed class UpdateProfileTagsCommandHandler(
 
             if (!tag.IsAttachable)
                 return TagErrors.Banned;
+
+            // Distinct slugs can still resolve to the same tag through aliases.
+            if (!seenTagIds.Add(tag.Id))
+                return TagErrors.Duplicate;
 
             assignments.Add(new TagAssignment(tag, input.Tier, input.IsPublic));
         }

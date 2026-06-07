@@ -15,7 +15,7 @@ internal sealed class GetTagDetailsQueryHandler(
     {
         var slug = normalizer.ToSlug(request.Slug);
 
-        var tag = await tagRepository.GetBySlugAsync(slug, cancellationToken);
+        var tag = await tagRepository.GetBySlugResolvingAliasAsync(slug, cancellationToken);
         if (tag is null)
             return TagErrors.NotFound;
 

@@ -43,6 +43,12 @@ public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
                 id => id.ToString(),
                 value => Ulid.Parse(value));
 
+        builder.Property(tag => tag.MergedIntoId)
+            .HasColumnName("merged_into_id")
+            .HasConversion(
+                id => id == null ? null : id.ToString(),
+                value => value == null ? null : Ulid.Parse(value));
+
         builder.Property(tag => tag.LastUsedAt)
             .HasColumnName("last_used_at");
 

@@ -25,6 +25,15 @@ public static class TagErrors
     public static Error Duplicate =>
         Error.Validation("Tag.Duplicate", "The same tag cannot be added to a profile twice.");
 
+    public static Error CannotMergeIntoSelf =>
+        Error.Validation("Tag.CannotMergeIntoSelf", "A tag cannot be merged into itself.");
+
+    public static Error InvalidMergeTarget =>
+        Error.Validation("Tag.InvalidMergeTarget", "The merge target must be an active tag.");
+
+    public static Error AlreadyMerged =>
+        Error.Validation("Tag.AlreadyMerged", "This tag has already been merged.");
+
     public static Error TooManyPrimaryTags =>
         Error.Validation("Tag.TooManyPrimary",
             $"A profile can have at most {TagLimits.MaxPrimaryProfileTags} primary tags.");

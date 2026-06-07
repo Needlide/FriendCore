@@ -77,6 +77,9 @@ try
                 nameof(UserRole.SeniorModerator),
                 nameof(UserRole.Admin)));
 
+        options.AddPolicy(AuthorizationPolicies.TagMerge, policy =>
+            policy.RequireRole(nameof(UserRole.SeniorModerator), nameof(UserRole.Admin)));
+
         options.AddPolicy(AuthorizationPolicies.Admin, policy =>
             policy.RequireRole(nameof(UserRole.Admin)));
     });

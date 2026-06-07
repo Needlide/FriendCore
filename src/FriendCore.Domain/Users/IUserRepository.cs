@@ -8,6 +8,7 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameSlugAsync(string usernameSlug, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(Ulid tagId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default);
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
 }

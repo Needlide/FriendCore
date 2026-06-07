@@ -5,5 +5,6 @@ public enum TagStatus
     PendingReview,
     Active,
     Archived,
-    Banned
+    Banned,
+    Merged
 }

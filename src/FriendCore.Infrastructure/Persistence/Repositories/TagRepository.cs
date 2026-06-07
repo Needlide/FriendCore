@@ -10,6 +10,15 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
         return context.Tags.FirstOrDefaultAsync(tag => tag.Slug == slug, cancellationToken);
     }
 
+    public async Task<Tag?> GetBySlugResolvingAliasAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        var tag = await context.Tags.FirstOrDefaultAsync(t => t.Slug == slug, cancellationToken);
+        if (tag is { Status: TagStatus.Merged, MergedIntoId: { } targetId })
+            return await GetByIdAsync(targetId, cancellationToken);
+
+        return tag;
+    }
+
     public Task<Tag?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default)
     {
         return context.Tags.FirstOrDefaultAsync(tag => tag.Id == id, cancellationToken);
