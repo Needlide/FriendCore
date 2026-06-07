@@ -1,11 +1,14 @@
 using ErrorOr;
 using FriendCore.Domain.Common;
+using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users.Events;
 
 namespace FriendCore.Domain.Users;
 
 public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
 {
+    private readonly List<ProfileTag> _profileTags = [];
+
     private User(Ulid id, DateTimeOffset createdAt)
         : base(id, createdAt)
     {
@@ -14,6 +17,8 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     private User()
     {
     }
+
+    public IReadOnlyList<ProfileTag> ProfileTags => _profileTags.AsReadOnly();
 
     public string Username { get; private set; } = null!;
     public string UsernameSlug { get; private set; } = null!;
@@ -90,6 +95,35 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         Profile.Update(bio, websiteUrl, location);
         UpdatedAt = updatedAt;
         return Result.Success;
+    }
+
+    public ErrorOr<Success> AddProfileTag(Ulid tagId, TagTier tier, bool isPublic, DateTimeOffset at)
+    {
+        if (_profileTags.Any(tag => tag.TagId == tagId))
+            return TagErrors.Duplicate;
+
+        var tierCount = _profileTags.Count(tag => tag.Tier == tier);
+        switch (tier)
+        {
+            case TagTier.Primary when tierCount >= TagLimits.MaxPrimaryProfileTags:
+                return TagErrors.TooManyPrimaryTags;
+            case TagTier.Secondary when tierCount >= TagLimits.MaxSecondaryProfileTags:
+                return TagErrors.TooManySecondaryTags;
+        }
+
+        _profileTags.Add(ProfileTag.Create(Id, tagId, tier, isPublic, at));
+        UpdatedAt = at;
+        return Result.Success;
+    }
+
+    public bool RemoveProfileTag(Ulid tagId)
+    {
+        var existing = _profileTags.FirstOrDefault(tag => tag.TagId == tagId);
+        if (existing is null)
+            return false;
+
+        _profileTags.Remove(existing);
+        return true;
     }
 
     public ErrorOr<Success> MarkEmailVerified(DateTimeOffset verifiedAt)
