@@ -2,6 +2,7 @@ using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Options;
 using FriendCore.Domain.Users;
 using FriendCore.Infrastructure.Authentication;
+using FriendCore.Infrastructure.Caching;
 using FriendCore.Infrastructure.Common;
 using FriendCore.Infrastructure.Email;
 using FriendCore.Infrastructure.Persistence;
@@ -10,6 +11,7 @@ using FriendCore.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 
 namespace FriendCore.Infrastructure;
 
@@ -51,7 +53,23 @@ public static class DependencyInjection
 
         var redisConnection = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redisConnection))
+        {
+            var redisOptions = ConfigurationOptions.Parse(redisConnection);
+            // Keep startup resilient: a briefly-unavailable Redis must not crash the app or
+            // block requests — the multiplexer reconnects in the background.
+            redisOptions.AbortOnConnectFail = false;
+
+            // Lazy: connects on first cache use, so paths that never touch the cache (e.g. tests)
+            // don't open a connection.
+            services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisOptions));
+            services.AddSingleton<ICacheService, RedisCacheService>();
+
             healthChecks.AddRedis(redisConnection, "redis");
+        }
+        else
+        {
+            services.AddSingleton<ICacheService, NullCacheService>();
+        }
 
         return services;
     }
