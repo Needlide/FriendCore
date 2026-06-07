@@ -18,9 +18,14 @@ public sealed class UserProfile
 
     internal void Update(string? bio, string? websiteUrl, string? location)
     {
-        Bio = NormalizeOptional(bio);
-        WebsiteUrl = NormalizeOptional(websiteUrl);
-        Location = NormalizeOptional(location);
+        if (bio != null)
+            Bio = NormalizeOptional(bio);
+        
+        if (websiteUrl != null)
+            WebsiteUrl = NormalizeOptional(websiteUrl);
+        
+        if (location != null)
+            Location = NormalizeOptional(location);
     }
 
     private static string? NormalizeOptional(string? value)

@@ -7,12 +7,12 @@ public sealed class EmailVerificationTokenRepository(AppDbContext context) : IEm
 {
     public Task<EmailVerificationToken?> GetActiveByTokenHashAsync(
         string tokenHash,
+        DateTimeOffset asOf,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
         return context.EmailVerificationTokens
             .FirstOrDefaultAsync(
-                token => token.TokenHash == tokenHash && token.ConsumedAt == null && token.ExpiresAt > now,
+                token => token.TokenHash == tokenHash && token.ConsumedAt == null && token.ExpiresAt > asOf,
                 cancellationToken);
     }
 

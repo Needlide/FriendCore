@@ -34,17 +34,6 @@ internal sealed class UpdateProfileCommandHandler(
             return updateResult.Errors;
 
         await userRepository.UpdateAsync(user, cancellationToken);
-        return MapProfile(user);
+        return UserProfileResponse.FromUser(user);
     }
-
-    internal static UserProfileResponse MapProfile(User user) =>
-        new(
-            user.Id.ToString(),
-            user.Username,
-            user.DisplayName,
-            user.Profile.Bio,
-            user.Profile.WebsiteUrl,
-            user.Profile.Location,
-            user.IsVerified,
-            user.CreatedAt);
 }

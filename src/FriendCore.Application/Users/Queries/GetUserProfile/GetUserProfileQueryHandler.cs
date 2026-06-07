@@ -1,6 +1,5 @@
 using ErrorOr;
 using FriendCore.Application.Common.Models;
-using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Domain.Users;
 using MediatR;
 
@@ -19,6 +18,6 @@ internal sealed class GetUserProfileQueryHandler(IUserRepository userRepository)
         if (user is null || user.IsBanned)
             return UserErrors.NotFound;
 
-        return UpdateProfileCommandHandler.MapProfile(user);
+        return UserProfileResponse.FromUser(user);
     }
 }

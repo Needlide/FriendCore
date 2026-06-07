@@ -16,10 +16,11 @@ internal sealed class VerifyEmailCommandHandler(
 {
     public async Task<ErrorOr<AuthResponse>> Handle(VerifyEmailCommand request, CancellationToken cancellationToken)
     {
+        var now = dateTimeProvider.UtcNow;
         var tokenHash = tokenHasher.Hash(request.Token.Trim());
-        var verificationToken = await tokenRepository.GetActiveByTokenHashAsync(tokenHash, cancellationToken);
+        var verificationToken = await tokenRepository.GetActiveByTokenHashAsync(tokenHash, now, cancellationToken);
 
-        if (verificationToken is null || !verificationToken.IsActive(dateTimeProvider.UtcNow))
+        if (verificationToken is null || !verificationToken.IsActive(now))
             return UserErrors.InvalidVerificationToken;
 
         var user = await userRepository.GetByIdAsync(verificationToken.UserId, cancellationToken);
@@ -29,7 +30,6 @@ internal sealed class VerifyEmailCommandHandler(
         if (user.IsVerified)
             return UserErrors.EmailAlreadyVerified;
 
-        var now = dateTimeProvider.UtcNow;
         var verifyResult = user.MarkEmailVerified(now);
         if (verifyResult.IsError)
             return verifyResult.Errors;

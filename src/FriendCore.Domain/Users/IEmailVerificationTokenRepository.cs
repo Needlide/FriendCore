@@ -4,6 +4,7 @@ public interface IEmailVerificationTokenRepository
 {
     Task<EmailVerificationToken?> GetActiveByTokenHashAsync(
         string tokenHash,
+        DateTimeOffset asOf,
         CancellationToken cancellationToken = default);
 
     Task RevokeActiveForUserAsync(Ulid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
