@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<Follow> Follows => Set<Follow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

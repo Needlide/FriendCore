@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<IFollowRepository, FollowRepository>();
         services.AddHostedService<TagMaintenanceService>();
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.AddSingleton<IEmailVerificationTokenHasher, EmailVerificationTokenHasher>();

@@ -126,6 +126,27 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Users.Follow", b =>
+                {
+                    b.Property<string>("FollowerId")
+                        .HasColumnType("text")
+                        .HasColumnName("follower_id");
+
+                    b.Property<string>("FollowedId")
+                        .HasColumnType("text")
+                        .HasColumnName("followed_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("FollowerId", "FollowedId");
+
+                    b.HasIndex("FollowedId");
+
+                    b.ToTable("follows", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.User", b =>
                 {
                     b.Property<string>("Id")

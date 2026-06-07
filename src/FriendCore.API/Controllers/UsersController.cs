@@ -2,7 +2,11 @@ using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Contracts.Users;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
+using FriendCore.Application.Users.Commands.FollowUser;
+using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UpdateProfile;
+using FriendCore.Application.Users.Queries.GetFollowers;
+using FriendCore.Application.Users.Queries.GetFollowing;
 using FriendCore.Application.Users.Queries.GetUserProfile;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -56,6 +60,49 @@ public sealed class UsersController(ISender sender) : ControllerBase
             .ToList();
 
         var result = await sender.Send(new UpdateProfileTagsCommand(tags), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPost("{username}/follow")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Follow(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new FollowUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpDelete("{username}/follow")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unfollow(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UnfollowUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpGet("{username}/followers")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Followers(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetFollowersQuery(username), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("{username}/following")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Following(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetFollowingQuery(username), cancellationToken);
         return result.ToActionResult();
     }
 }

@@ -29,6 +29,9 @@ public static class UserErrors
     public static Error NotFound =>
         Error.NotFound("User.NotFound", "User was not found.");
 
+    public static Error CannotFollowSelf =>
+        Error.Validation("User.CannotFollowSelf", "You cannot follow yourself.");
+
     public static Error EmailAlreadyVerified =>
         Error.Conflict("User.EmailAlreadyVerified", "Email is already verified.");
 
