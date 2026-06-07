@@ -3,6 +3,7 @@ using FriendCore.Application.Common.Options;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 using FriendCore.Infrastructure.Authentication;
+using FriendCore.Infrastructure.BackgroundJobs;
 using FriendCore.Infrastructure.Caching;
 using FriendCore.Infrastructure.Common;
 using FriendCore.Infrastructure.Email;
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
+        services.AddHostedService<TagMaintenanceService>();
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.AddSingleton<IEmailVerificationTokenHasher, EmailVerificationTokenHasher>();
         services.AddHttpClient<IEmailService, ResendEmailService>();

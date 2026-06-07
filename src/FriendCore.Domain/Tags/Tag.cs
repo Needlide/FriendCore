@@ -46,6 +46,20 @@ public sealed class Tag : AggregateRoot<Ulid>
         return Result.Success;
     }
 
+    public ErrorOr<Success> Archive()
+    {
+        if (Status == TagStatus.Banned)
+            return TagErrors.Banned;
+
+        Status = TagStatus.Archived;
+        return Result.Success;
+    }
+
+    public void Ban()
+    {
+        Status = TagStatus.Banned;
+    }
+
     public void RecordProfileAdded(DateTimeOffset at)
     {
         ProfileCount++;

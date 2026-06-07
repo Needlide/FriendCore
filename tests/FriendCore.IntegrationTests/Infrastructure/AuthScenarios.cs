@@ -75,6 +75,37 @@ public class AuthScenarios(FriendCoreApiFactory factory)
         await db.SaveChangesAsync();
     }
 
+    public async Task PromoteUserAsync(string email, UserRole role)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.Email == email);
+        user.AssignRole(role);
+        await db.SaveChangesAsync();
+    }
+
+    // Register, elevate the role in the DB, then log in so the issued token carries the new role.
+    public async Task<string> RegisterWithRoleAndGetToken(HttpClient client, string email, UserRole role)
+    {
+        await Register(client, email);
+        await PromoteUserAsync(email, role);
+
+        var login = await Login(client, email);
+        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
+        return body!.AccessToken;
+    }
+
+    // Seed an Active tag that is already stale (idle far past the 180-day window, no users).
+    public async Task SeedStaleActiveTagAsync(string name, string slug)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tag = Tag.Create(name, slug, Ulid.NewUlid(), DateTimeOffset.UtcNow.AddDays(-200));
+        tag.Approve();
+        db.Tags.Add(tag);
+        await db.SaveChangesAsync();
+    }
+
     public async Task AssertTag(string slug, Action<Tag> assert)
     {
         using var scope = factory.Services.CreateScope();

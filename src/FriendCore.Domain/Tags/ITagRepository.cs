@@ -14,6 +14,16 @@ public interface ITagRepository
         int limit,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Tag>> GetByStatusAsync(
+        TagStatus status,
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Tag>> GetArchivableAsync(
+        int maxProfileCountExclusive,
+        DateTimeOffset lastUsedBefore,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Tag tag, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(CancellationToken cancellationToken = default);

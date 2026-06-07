@@ -40,6 +40,31 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Tag>> GetByStatusAsync(
+        TagStatus status,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Tags
+            .Where(tag => tag.Status == status)
+            .OrderBy(tag => tag.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Tag>> GetArchivableAsync(
+        int maxProfileCountExclusive,
+        DateTimeOffset lastUsedBefore,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Tags
+            .Where(tag =>
+                (tag.Status == TagStatus.Active || tag.Status == TagStatus.PendingReview) &&
+                tag.ProfileCount < maxProfileCountExclusive &&
+                tag.LastUsedAt < lastUsedBefore)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Tag tag, CancellationToken cancellationToken = default)
     {
         await context.Tags.AddAsync(tag, cancellationToken);
