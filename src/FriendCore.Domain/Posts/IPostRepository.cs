@@ -16,6 +16,13 @@ public interface IPostRepository
         int limit,
         CancellationToken cancellationToken = default);
 
+    // Posts authored by users the given user follows, newest first.
+    Task<IReadOnlyList<Post>> GetHomeFeedAsync(
+        Ulid userId,
+        DateTimeOffset? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     Task<bool> LikeExistsAsync(Ulid postId, Ulid userId, CancellationToken cancellationToken = default);
 
     // Adds the like and persists; any tracked post count change is saved in the same unit of work.

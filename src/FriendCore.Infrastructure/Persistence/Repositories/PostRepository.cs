@@ -45,6 +45,24 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Post>> GetHomeFeedAsync(
+        Ulid userId,
+        DateTimeOffset? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var query = context.Posts.Where(post =>
+            context.Follows.Any(follow => follow.FollowerId == userId && follow.FollowedId == post.AuthorId));
+
+        if (cursor is { } before)
+            query = query.Where(post => post.CreatedAt < before);
+
+        return await query
+            .OrderByDescending(post => post.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> LikeExistsAsync(Ulid postId, Ulid userId, CancellationToken cancellationToken = default)
     {
         return context.Likes.AnyAsync(
