@@ -22,4 +22,15 @@ internal static class UserTestFactory
         user.MarkEmailVerified(verifiedAt ?? DefaultCreatedAt);
         return user;
     }
+
+    // No domain ban API exists yet; the IsBanned setter is private. Set it via
+    // reflection so the AccountBanned guard stays covered. Replace with a real
+    // User.Ban(...) call once the moderation phase adds one.
+    // TODO replace with a real Ban logic
+    public static User CreateBanned()
+    {
+        var user = Create();
+        typeof(User).GetProperty(nameof(User.IsBanned))!.SetValue(user, true);
+        return user;
+    }
 }
