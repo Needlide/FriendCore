@@ -20,9 +20,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
-        var email = UniqueEmail();
+        var email = AuthScenarios.UniqueEmail();
 
-        var registered = await Register(client, email);
+        var registered = await AuthScenarios.Register(client, email);
         Assert.Equal(HttpStatusCode.Created, registered.StatusCode);
         var registerBody = await registered.Content.ReadFromJsonAsync<AuthResponse>();
         Assert.False(registerBody!.IsEmailVerified);
@@ -34,7 +34,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         var verifyBody = await verify.Content.ReadFromJsonAsync<AuthResponse>();
         Assert.True(verifyBody!.IsEmailVerified);
 
-        await AssertUser(email, user =>
+        var authScenarios = new AuthScenarios(factory);
+        
+        await authScenarios.AssertUser(email, user =>
         {
             Assert.True(user.IsVerified);
         });
@@ -50,9 +52,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
-        var email = UniqueEmail();
+        var email = AuthScenarios.UniqueEmail();
 
-        await Register(client, email);
+        await AuthScenarios.Register(client, email);
         var token = ExtractVerificationToken(email);
 
         var first = await client.PostAsJsonAsync("/api/v1/auth/verify-email", new { token });
@@ -81,9 +83,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         var start = DateTimeOffset.UtcNow;
         factory.Clock.Set(start);
         var client = factory.CreateClient();
-        var email = UniqueEmail();
+        var email = AuthScenarios.UniqueEmail();
 
-        await Register(client, email);
+        await AuthScenarios.Register(client, email);
         var token = ExtractVerificationToken(email);
 
         // Token validity is 24h; jump past it.
@@ -92,7 +94,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         var response = await client.PostAsJsonAsync("/api/v1/auth/verify-email", new { token });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        await AssertUser(email, user => Assert.False(user.IsVerified));
+        var authScenarios = new AuthScenarios(factory);
+        
+        await authScenarios.AssertUser(email, user => Assert.False(user.IsVerified));
         factory.Clock.Reset();
     }
 
@@ -101,9 +105,9 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
-        var email = UniqueEmail();
+        var email = AuthScenarios.UniqueEmail();
 
-        var registered = await Register(client, email);
+        var registered = await AuthScenarios.Register(client, email);
         var registerBody = await registered.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", registerBody!.AccessToken);
@@ -123,14 +127,6 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         Assert.Equal(2, verificationEmails);
     }
 
-    private static Task<HttpResponseMessage> Register(HttpClient client, string email)
-    {
-        var username = "u" + Ulid.NewUlid().ToString().ToLowerInvariant()[..20];
-        return client.PostAsJsonAsync(
-            "/api/v1/auth/register",
-            new { username, displayName = "Test User", email, password = "password123" });
-    }
-
     private string ExtractVerificationToken(string email)
     {
         var message = factory.Emails
@@ -146,14 +142,6 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         return Uri.UnescapeDataString(raw);
     }
 
-    private async Task AssertUser(string email, Action<User> assert)
-    {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
-        assert(user);
-    }
-
     private async Task AssertTokens(string email, Action<List<EmailVerificationToken>> assert)
     {
         using var scope = factory.Services.CreateScope();
@@ -164,6 +152,4 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
             .ToListAsync();
         assert(tokens);
     }
-
-    private static string UniqueEmail() => $"user-{Ulid.NewUlid()}@example.com".ToLowerInvariant();
 }
