@@ -1,5 +1,4 @@
 using FriendCore.Application.Common.Interfaces;
-using FriendCore.Application.Common.Models;
 using FriendCore.Application.Users.Commands.LoginUser;
 using FriendCore.Domain.Users;
 using NSubstitute;
@@ -9,11 +8,11 @@ namespace FriendCore.UnitTests.Users;
 public class LoginUserCommandHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
+    private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
+    private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
+    private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
 
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
-    private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
-    private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
-    private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
 
     public LoginUserCommandHandlerTests()
     {
@@ -22,8 +21,10 @@ public class LoginUserCommandHandlerTests
             .Returns(new AuthTokenResult("access-token", Now.AddHours(1)));
     }
 
-    private LoginUserCommandHandler CreateHandler() =>
-        new(_userRepository, _passwordHasher, _jwtTokenService, _dateTimeProvider);
+    private LoginUserCommandHandler CreateHandler()
+    {
+        return new LoginUserCommandHandler(_userRepository, _passwordHasher, _jwtTokenService, _dateTimeProvider);
+    }
 
     [Fact]
     public async Task Handle_ReturnsInvalidCredentials_WhenUserNotFound()
@@ -31,7 +32,8 @@ public class LoginUserCommandHandlerTests
         _userRepository.GetByEmailAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((User?)null);
 
-        var result = await CreateHandler().Handle(new LoginUserCommand("ghost@example.com", "pw"), CancellationToken.None);
+        var result = await CreateHandler()
+            .Handle(new LoginUserCommand("ghost@example.com", "pw"), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(UserErrors.InvalidCredentials.Code, result.FirstError.Code);

@@ -12,9 +12,15 @@ public class AuthScenarios(FriendCoreApiFactory factory)
 {
     public const string DefaultPassword = "password123";
 
-    public static string NewUsername() => "u" + Ulid.NewUlid().ToString().ToLowerInvariant()[..20];
+    public static string NewUsername()
+    {
+        return "u" + Ulid.NewUlid().ToString().ToLowerInvariant()[..20];
+    }
 
-    public static string UniqueEmail() => $"user-{Ulid.NewUlid()}@example.com".ToLowerInvariant();
+    public static string UniqueEmail()
+    {
+        return $"user-{Ulid.NewUlid()}@example.com".ToLowerInvariant();
+    }
 
     public static Task<HttpResponseMessage> Register(
         HttpClient client,

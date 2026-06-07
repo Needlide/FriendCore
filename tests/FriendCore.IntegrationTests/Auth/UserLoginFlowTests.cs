@@ -95,7 +95,7 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        var resend = await client.PostAsync("/api/v1/auth/resend-verification", content: null);
+        var resend = await client.PostAsync("/api/v1/auth/resend-verification", null);
 
         Assert.Equal(HttpStatusCode.NoContent, resend.StatusCode);
     }

@@ -32,7 +32,13 @@ public sealed class EmailVerificationToken : Entity<Ulid>
         };
     }
 
-    public bool IsActive(DateTimeOffset at) => ConsumedAt is null && ExpiresAt > at;
+    public bool IsActive(DateTimeOffset at)
+    {
+        return ConsumedAt is null && ExpiresAt > at;
+    }
 
-    public void Consume(DateTimeOffset at) => ConsumedAt = at;
+    public void Consume(DateTimeOffset at)
+    {
+        ConsumedAt = at;
+    }
 }

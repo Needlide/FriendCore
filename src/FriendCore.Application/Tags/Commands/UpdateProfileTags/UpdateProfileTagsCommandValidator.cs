@@ -1,5 +1,4 @@
 using FluentValidation;
-using FriendCore.Domain.Tags;
 
 namespace FriendCore.Application.Tags.Commands.UpdateProfileTags;
 

@@ -9,6 +9,8 @@ public sealed record TagResponse(
     string Status,
     int TotalCount)
 {
-    public static TagResponse FromTag(Tag tag) =>
-        new(tag.Id.ToString(), tag.Name, tag.Slug, tag.Status.ToString(), tag.TotalCount);
+    public static TagResponse FromTag(Tag tag)
+    {
+        return new TagResponse(tag.Id.ToString(), tag.Name, tag.Slug, tag.Status.ToString(), tag.TotalCount);
+    }
 }

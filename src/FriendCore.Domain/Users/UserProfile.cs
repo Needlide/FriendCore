@@ -20,10 +20,10 @@ public sealed class UserProfile
     {
         if (bio != null)
             Bio = NormalizeOptional(bio);
-        
+
         if (websiteUrl != null)
             WebsiteUrl = NormalizeOptional(websiteUrl);
-        
+
         if (location != null)
             Location = NormalizeOptional(location);
     }

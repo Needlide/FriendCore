@@ -12,8 +12,11 @@ public class GetTagAutocompleteQueryHandlerTests
 
     private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
 
-    private GetTagAutocompleteQueryHandler CreateHandler() =>
-        new(_tagRepository, new TagNormalizationService(), new NullCacheService());
+    private GetTagAutocompleteQueryHandler CreateHandler()
+    {
+        return new GetTagAutocompleteQueryHandler(_tagRepository, new TagNormalizationService(),
+            new NullCacheService());
+    }
 
     private static Tag ActiveTag(string name, string slug)
     {

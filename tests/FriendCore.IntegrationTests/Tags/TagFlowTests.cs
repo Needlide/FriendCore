@@ -42,12 +42,14 @@ public class TagFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCo
         var client = await AuthenticatedClient(AuthScenarios.UniqueEmail());
         await client.PostAsJsonAsync("/api/v1/tags", new { name = "Watercolour" });
 
-        var beforeApproval = await client.GetFromJsonAsync<TagAutocompleteResponse>("/api/v1/tags/autocomplete?query=water");
+        var beforeApproval =
+            await client.GetFromJsonAsync<TagAutocompleteResponse>("/api/v1/tags/autocomplete?query=water");
         Assert.DoesNotContain(beforeApproval!.Suggestions, s => s.Slug == "watercolour");
 
         await _scenarios.ApproveTagAsync("watercolour");
 
-        var afterApproval = await client.GetFromJsonAsync<TagAutocompleteResponse>("/api/v1/tags/autocomplete?query=watercolour");
+        var afterApproval =
+            await client.GetFromJsonAsync<TagAutocompleteResponse>("/api/v1/tags/autocomplete?query=watercolour");
         Assert.Contains(afterApproval!.Suggestions, s => s.Slug == "watercolour");
         Assert.True(afterApproval.HasExactMatch);
     }

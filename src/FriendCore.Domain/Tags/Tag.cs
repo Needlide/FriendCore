@@ -23,6 +23,8 @@ public sealed class Tag : AggregateRoot<Ulid>
     public int PostCount { get; private set; }
     public int TotalCount { get; private set; }
 
+    public bool IsAttachable => Status != TagStatus.Banned;
+
     public static Tag Create(string name, string slug, Ulid createdById, DateTimeOffset createdAt)
     {
         return new Tag(Ulid.NewUlid(), createdAt)
@@ -34,8 +36,6 @@ public sealed class Tag : AggregateRoot<Ulid>
             LastUsedAt = createdAt
         };
     }
-
-    public bool IsAttachable => Status != TagStatus.Banned;
 
     public ErrorOr<Success> Approve()
     {

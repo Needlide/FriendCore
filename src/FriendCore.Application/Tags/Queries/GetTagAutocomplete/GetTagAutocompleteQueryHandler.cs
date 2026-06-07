@@ -22,7 +22,7 @@ internal sealed class GetTagAutocompleteQueryHandler(
     {
         var slug = normalizer.ToSlug(request.Query);
         if (slug.Length == 0)
-            return new TagAutocompleteResponse(slug, [], HasExactMatch: false);
+            return new TagAutocompleteResponse(slug, [], false);
 
         return await cache.GetOrSetAsync(
             $"tags:autocomplete:{slug}",

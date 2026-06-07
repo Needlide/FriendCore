@@ -35,11 +35,8 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         Assert.True(verifyBody!.IsEmailVerified);
 
         var authScenarios = new AuthScenarios(factory);
-        
-        await authScenarios.AssertUser(email, user =>
-        {
-            Assert.True(user.IsVerified);
-        });
+
+        await authScenarios.AssertUser(email, user => { Assert.True(user.IsVerified); });
         await AssertTokens(email, tokens =>
         {
             Assert.Single(tokens);
@@ -95,7 +92,7 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var authScenarios = new AuthScenarios(factory);
-        
+
         await authScenarios.AssertUser(email, user => Assert.False(user.IsVerified));
         factory.Clock.Reset();
     }
@@ -112,7 +109,7 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", registerBody!.AccessToken);
 
-        var resend = await client.PostAsync("/api/v1/auth/resend-verification", content: null);
+        var resend = await client.PostAsync("/api/v1/auth/resend-verification", null);
         Assert.Equal(HttpStatusCode.NoContent, resend.StatusCode);
 
         await AssertTokens(email, tokens =>

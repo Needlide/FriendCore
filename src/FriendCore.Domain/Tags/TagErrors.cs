@@ -26,8 +26,10 @@ public static class TagErrors
         Error.Validation("Tag.Duplicate", "The same tag cannot be added to a profile twice.");
 
     public static Error TooManyPrimaryTags =>
-        Error.Validation("Tag.TooManyPrimary", $"A profile can have at most {TagLimits.MaxPrimaryProfileTags} primary tags.");
+        Error.Validation("Tag.TooManyPrimary",
+            $"A profile can have at most {TagLimits.MaxPrimaryProfileTags} primary tags.");
 
     public static Error TooManySecondaryTags =>
-        Error.Validation("Tag.TooManySecondary", $"A profile can have at most {TagLimits.MaxSecondaryProfileTags} secondary tags.");
+        Error.Validation("Tag.TooManySecondary",
+            $"A profile can have at most {TagLimits.MaxSecondaryProfileTags} secondary tags.");
 }

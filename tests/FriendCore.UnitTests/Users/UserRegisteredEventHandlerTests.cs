@@ -12,13 +12,14 @@ namespace FriendCore.UnitTests.Users;
 public class UserRegisteredEventHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
-
-    private readonly IEmailVerificationTokenRepository _tokenRepository = Substitute.For<IEmailVerificationTokenRepository>();
-    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
-    private readonly IEmailService _emailService = Substitute.For<IEmailService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly IOptions<EmailOptions> _emailOptions = Options.Create(new EmailOptions());
+    private readonly IEmailService _emailService = Substitute.For<IEmailService>();
     private readonly NullLogger<UserRegisteredEventHandler> _logger = NullLogger<UserRegisteredEventHandler>.Instance;
+    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
+
+    private readonly IEmailVerificationTokenRepository _tokenRepository =
+        Substitute.For<IEmailVerificationTokenRepository>();
 
     public UserRegisteredEventHandlerTests()
     {
@@ -27,11 +28,16 @@ public class UserRegisteredEventHandlerTests
         _tokenHasher.Hash("raw-token").Returns("hashed-token");
     }
 
-    private UserRegisteredEventHandler CreateHandler() =>
-        new(_tokenRepository, _tokenHasher, _emailService, _dateTimeProvider, _emailOptions, _logger);
+    private UserRegisteredEventHandler CreateHandler()
+    {
+        return new UserRegisteredEventHandler(_tokenRepository, _tokenHasher, _emailService, _dateTimeProvider,
+            _emailOptions, _logger);
+    }
 
-    private static UserRegisteredEvent Event() =>
-        new(Ulid.NewUlid(), "alice@example.com", "Alice", "alice", Now);
+    private static UserRegisteredEvent Event()
+    {
+        return new UserRegisteredEvent(Ulid.NewUlid(), "alice@example.com", "Alice", "alice", Now);
+    }
 
     [Fact]
     public async Task Handle_PersistsTokenAndSendsWelcomeAndVerificationEmails()
@@ -40,7 +46,8 @@ public class UserRegisteredEventHandlerTests
 
         await CreateHandler().Handle(notification, CancellationToken.None);
 
-        await _tokenRepository.Received(1).RevokeActiveForUserAsync(notification.UserId, Now, Arg.Any<CancellationToken>());
+        await _tokenRepository.Received(1)
+            .RevokeActiveForUserAsync(notification.UserId, Now, Arg.Any<CancellationToken>());
         await _tokenRepository.Received(1).AddAsync(
             Arg.Is<EmailVerificationToken>(t => t.UserId == notification.UserId && t.TokenHash == "hashed-token"),
             Arg.Any<CancellationToken>());

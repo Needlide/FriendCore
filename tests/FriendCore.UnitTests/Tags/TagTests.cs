@@ -6,7 +6,10 @@ public class TagTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
 
-    private static Tag NewTag() => Tag.Create("C Sharp", "c-sharp", Ulid.NewUlid(), Now);
+    private static Tag NewTag()
+    {
+        return Tag.Create("C Sharp", "c-sharp", Ulid.NewUlid(), Now);
+    }
 
     [Fact]
     public void Create_StartsPendingReview_WithZeroCounts()

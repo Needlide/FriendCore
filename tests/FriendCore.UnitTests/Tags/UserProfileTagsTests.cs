@@ -13,7 +13,7 @@ public class UserProfileTagsTests
         var user = UserTestFactory.Create();
         var tagId = Ulid.NewUlid();
 
-        var result = user.AddProfileTag(tagId, TagTier.Primary, isPublic: true, Now);
+        var result = user.AddProfileTag(tagId, TagTier.Primary, true, Now);
 
         Assert.False(result.IsError);
         var added = Assert.Single(user.ProfileTags);
@@ -28,9 +28,9 @@ public class UserProfileTagsTests
     {
         var user = UserTestFactory.Create();
         var tagId = Ulid.NewUlid();
-        user.AddProfileTag(tagId, TagTier.Primary, isPublic: true, Now);
+        user.AddProfileTag(tagId, TagTier.Primary, true, Now);
 
-        var result = user.AddProfileTag(tagId, TagTier.Secondary, isPublic: false, Now);
+        var result = user.AddProfileTag(tagId, TagTier.Secondary, false, Now);
 
         Assert.True(result.IsError);
         Assert.Equal("Tag.Duplicate", result.FirstError.Code);
@@ -42,9 +42,9 @@ public class UserProfileTagsTests
     {
         var user = UserTestFactory.Create();
         for (var i = 0; i < TagLimits.MaxPrimaryProfileTags; i++)
-            Assert.False(user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, isPublic: true, Now).IsError);
+            Assert.False(user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, true, Now).IsError);
 
-        var overflow = user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, isPublic: true, Now);
+        var overflow = user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, true, Now);
 
         Assert.True(overflow.IsError);
         Assert.Equal("Tag.TooManyPrimary", overflow.FirstError.Code);
@@ -56,9 +56,9 @@ public class UserProfileTagsTests
     {
         var user = UserTestFactory.Create();
         for (var i = 0; i < TagLimits.MaxPrimaryProfileTags; i++)
-            user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, isPublic: true, Now);
+            user.AddProfileTag(Ulid.NewUlid(), TagTier.Primary, true, Now);
 
-        var secondary = user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, isPublic: true, Now);
+        var secondary = user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, true, Now);
 
         Assert.False(secondary.IsError);
     }
@@ -68,9 +68,9 @@ public class UserProfileTagsTests
     {
         var user = UserTestFactory.Create();
         for (var i = 0; i < TagLimits.MaxSecondaryProfileTags; i++)
-            user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, isPublic: true, Now);
+            user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, true, Now);
 
-        var overflow = user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, isPublic: true, Now);
+        var overflow = user.AddProfileTag(Ulid.NewUlid(), TagTier.Secondary, true, Now);
 
         Assert.True(overflow.IsError);
         Assert.Equal("Tag.TooManySecondary", overflow.FirstError.Code);
@@ -81,7 +81,7 @@ public class UserProfileTagsTests
     {
         var user = UserTestFactory.Create();
         var tagId = Ulid.NewUlid();
-        user.AddProfileTag(tagId, TagTier.Primary, isPublic: true, Now);
+        user.AddProfileTag(tagId, TagTier.Primary, true, Now);
 
         Assert.True(user.RemoveProfileTag(tagId));
         Assert.Empty(user.ProfileTags);

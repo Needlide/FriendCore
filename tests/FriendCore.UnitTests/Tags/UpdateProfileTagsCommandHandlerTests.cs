@@ -11,12 +11,12 @@ namespace FriendCore.UnitTests.Tags;
 public class UpdateProfileTagsCommandHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
-
-    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
-    private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
+    private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
     private readonly User _user = UserTestFactory.Create();
+
+    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
 
     public UpdateProfileTagsCommandHandlerTests()
     {
@@ -28,10 +28,17 @@ public class UpdateProfileTagsCommandHandlerTests
             .Returns([]);
     }
 
-    private UpdateProfileTagsCommandHandler CreateHandler() =>
-        new(_userRepository, _tagRepository, new TagNormalizationService(), _currentUserService, _dateTimeProvider);
+    private UpdateProfileTagsCommandHandler CreateHandler()
+    {
+        return new UpdateProfileTagsCommandHandler(_userRepository, _tagRepository, new TagNormalizationService(),
+            _currentUserService,
+            _dateTimeProvider);
+    }
 
-    private static UpdateProfileTagsCommand Command(params ProfileTagInput[] tags) => new(tags);
+    private static UpdateProfileTagsCommand Command(params ProfileTagInput[] tags)
+    {
+        return new UpdateProfileTagsCommand(tags);
+    }
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -124,7 +131,7 @@ public class UpdateProfileTagsCommandHandlerTests
     {
         var existingTag = Tag.Create("Photography", "photography", Ulid.NewUlid(), Now);
         existingTag.RecordProfileAdded(Now);
-        _user.AddProfileTag(existingTag.Id, TagTier.Primary, isPublic: true, Now);
+        _user.AddProfileTag(existingTag.Id, TagTier.Primary, true, Now);
         _tagRepository.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([existingTag]);
 

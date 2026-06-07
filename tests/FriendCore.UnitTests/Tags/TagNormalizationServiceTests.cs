@@ -33,10 +33,10 @@ public class TagNormalizationServiceTests
     }
 
     [Theory]
-    [InlineData("a")]          // one usable char -> too short
-    [InlineData("C++")]        // symbols stripped -> "c" -> too short (symbol mapping deferred)
-    [InlineData("!!!")]        // nothing usable -> empty
-    [InlineData("   ")]        // whitespace only -> empty
+    [InlineData("a")] // one usable char -> too short
+    [InlineData("C++")] // symbols stripped -> "c" -> too short (symbol mapping deferred)
+    [InlineData("!!!")] // nothing usable -> empty
+    [InlineData("   ")] // whitespace only -> empty
     public void Normalize_RejectsInputThatNormalizesTooShort(string input)
     {
         var result = _normalizer.Normalize(input);

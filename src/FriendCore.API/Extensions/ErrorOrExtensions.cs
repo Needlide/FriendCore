@@ -5,7 +5,10 @@ namespace FriendCore.API.Extensions;
 
 public static class ErrorOrExtensions
 {
-    public static IActionResult FromErrors(List<Error> errors) => ToErrorActionResult(errors);
+    public static IActionResult FromErrors(List<Error> errors)
+    {
+        return ToErrorActionResult(errors);
+    }
 
     private static ActionResult ToErrorActionResult(List<Error> errors)
     {

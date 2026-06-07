@@ -40,7 +40,8 @@ public sealed class TagsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> CreateOrGet([FromBody] CreateTagRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateOrGet([FromBody] CreateTagRequest request,
+        CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CreateOrGetTagCommand(request.Name), cancellationToken);
         return result.ToActionResult();

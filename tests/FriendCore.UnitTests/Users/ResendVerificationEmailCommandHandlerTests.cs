@@ -12,12 +12,15 @@ public class ResendVerificationEmailCommandHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
 
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
-    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
-    private readonly IEmailVerificationTokenRepository _tokenRepository = Substitute.For<IEmailVerificationTokenRepository>();
-    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
-    private readonly IEmailService _emailService = Substitute.For<IEmailService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly IOptions<EmailOptions> _emailOptions = Options.Create(new EmailOptions());
+    private readonly IEmailService _emailService = Substitute.For<IEmailService>();
+    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
+
+    private readonly IEmailVerificationTokenRepository _tokenRepository =
+        Substitute.For<IEmailVerificationTokenRepository>();
+
+    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
 
     public ResendVerificationEmailCommandHandlerTests()
     {
@@ -26,8 +29,9 @@ public class ResendVerificationEmailCommandHandlerTests
         _tokenHasher.Hash("raw-token").Returns("hashed-token");
     }
 
-    private ResendVerificationEmailCommandHandler CreateHandler() =>
-        new(
+    private ResendVerificationEmailCommandHandler CreateHandler()
+    {
+        return new ResendVerificationEmailCommandHandler(
             _currentUserService,
             _userRepository,
             _tokenRepository,
@@ -35,6 +39,7 @@ public class ResendVerificationEmailCommandHandlerTests
             _emailService,
             _dateTimeProvider,
             _emailOptions);
+    }
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()

@@ -10,11 +10,11 @@ public class UserUpdateProfileTests
     {
         var user = UserTestFactory.Create();
         user.UpdateProfile(
-            displayName: null,
-            bio: "Original bio",
-            websiteUrl: "https://alice.example",
-            location: "Berlin",
-            updatedAt: UserTestFactory.DefaultCreatedAt);
+            null,
+            "Original bio",
+            "https://alice.example",
+            "Berlin",
+            UserTestFactory.DefaultCreatedAt);
         return user;
     }
 
@@ -24,11 +24,11 @@ public class UserUpdateProfileTests
         var user = SeededUser();
 
         var result = user.UpdateProfile(
-            displayName: null,
-            bio: "New bio",
-            websiteUrl: null,
-            location: null,
-            updatedAt: UpdatedAt);
+            null,
+            "New bio",
+            null,
+            null,
+            UpdatedAt);
 
         Assert.False(result.IsError);
         Assert.Equal("New bio", user.Profile.Bio);
@@ -43,11 +43,11 @@ public class UserUpdateProfileTests
         var user = SeededUser();
 
         user.UpdateProfile(
-            displayName: null,
-            bio: "   ",
-            websiteUrl: null,
-            location: null,
-            updatedAt: UpdatedAt);
+            null,
+            "   ",
+            null,
+            null,
+            UpdatedAt);
 
         Assert.Null(user.Profile.Bio);
         Assert.Equal("https://alice.example", user.Profile.WebsiteUrl);
@@ -61,11 +61,11 @@ public class UserUpdateProfileTests
         var originalDisplayName = user.DisplayName;
 
         user.UpdateProfile(
-            displayName: null,
-            bio: "New bio",
-            websiteUrl: null,
-            location: null,
-            updatedAt: UpdatedAt);
+            null,
+            "New bio",
+            null,
+            null,
+            UpdatedAt);
 
         Assert.Equal(originalDisplayName, user.DisplayName);
     }
@@ -76,11 +76,11 @@ public class UserUpdateProfileTests
         var user = SeededUser();
 
         var result = user.UpdateProfile(
-            displayName: "   ",
-            bio: null,
-            websiteUrl: null,
-            location: null,
-            updatedAt: UpdatedAt);
+            "   ",
+            null,
+            null,
+            null,
+            UpdatedAt);
 
         Assert.True(result.IsError);
         Assert.Equal("User.InvalidDisplayName", result.FirstError.Code);

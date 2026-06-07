@@ -6,7 +6,8 @@ public interface ITagRepository
 
     Task<Tag?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Tag>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Tag>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Tag>> SearchActiveByPrefixAsync(
         string slugPrefix,

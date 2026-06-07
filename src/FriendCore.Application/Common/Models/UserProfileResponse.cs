@@ -12,8 +12,9 @@ public sealed record UserProfileResponse(
     bool IsVerified,
     DateTimeOffset CreatedAt)
 {
-    public static UserProfileResponse FromUser(User user) =>
-        new(
+    public static UserProfileResponse FromUser(User user)
+    {
+        return new UserProfileResponse(
             user.Id.ToString(),
             user.Username,
             user.DisplayName,
@@ -22,4 +23,5 @@ public sealed record UserProfileResponse(
             user.Profile.Location,
             user.IsVerified,
             user.CreatedAt);
+    }
 }

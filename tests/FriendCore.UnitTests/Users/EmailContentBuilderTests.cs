@@ -5,8 +5,10 @@ namespace FriendCore.UnitTests.Users;
 
 public class EmailContentBuilderTests
 {
-    private static EmailOptions Options(string baseUrl = "https://app.friendcore.com", int hours = 24) =>
-        new() { VerificationBaseUrl = baseUrl, VerificationTokenExpirationHours = hours };
+    private static EmailOptions Options(string baseUrl = "https://app.friendcore.com", int hours = 24)
+    {
+        return new EmailOptions { VerificationBaseUrl = baseUrl, VerificationTokenExpirationHours = hours };
+    }
 
     [Fact]
     public void BuildVerificationUrl_TrimsTrailingSlashAndAppendsPath()

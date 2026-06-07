@@ -12,7 +12,13 @@ public sealed class MutableDateTimeProvider : IDateTimeProvider
 
     public DateTimeOffset UtcNow => _override ?? DateTimeOffset.UtcNow;
 
-    public void Set(DateTimeOffset value) => _override = value;
+    public void Set(DateTimeOffset value)
+    {
+        _override = value;
+    }
 
-    public void Reset() => _override = null;
+    public void Reset()
+    {
+        _override = null;
+    }
 }

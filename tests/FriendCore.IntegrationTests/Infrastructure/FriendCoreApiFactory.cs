@@ -41,6 +41,22 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
 
     public MutableDateTimeProvider Clock { get; } = new();
 
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await _database.StartAsync();
+
+        // Accessing Services builds the host (running ConfigureWebHost above) so migrations target
+        // the container.
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    }
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await _database.DisposeAsync();
+        await base.DisposeAsync();
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -82,21 +98,5 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
                 options.AddPolicy(RateLimitingExtensions.ApiPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
             });
         });
-    }
-
-    async Task IAsyncLifetime.InitializeAsync()
-    {
-        await _database.StartAsync();
-
-        // Accessing Services builds the host (running ConfigureWebHost above) so migrations target
-        // the container.
-        using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
-    }
-
-    async Task IAsyncLifetime.DisposeAsync()
-    {
-        await _database.DisposeAsync();
-        await base.DisposeAsync();
     }
 }

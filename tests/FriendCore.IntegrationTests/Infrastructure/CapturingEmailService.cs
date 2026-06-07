@@ -18,6 +18,8 @@ public sealed class CapturingEmailService : IEmailService
         return Task.CompletedTask;
     }
 
-    public IEnumerable<EmailMessage> For(string recipient) =>
-        _messages.Where(m => string.Equals(m.To, recipient, StringComparison.OrdinalIgnoreCase));
+    public IEnumerable<EmailMessage> For(string recipient)
+    {
+        return _messages.Where(m => string.Equals(m.To, recipient, StringComparison.OrdinalIgnoreCase));
+    }
 }

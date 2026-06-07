@@ -9,10 +9,10 @@ namespace FriendCore.UnitTests.Tags;
 public class CreateOrGetTagCommandHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
-
-    private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
+
+    private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
     private readonly Ulid _userId = Ulid.NewUlid();
 
     public CreateOrGetTagCommandHandlerTests()
@@ -21,8 +21,11 @@ public class CreateOrGetTagCommandHandlerTests
         _dateTimeProvider.UtcNow.Returns(Now);
     }
 
-    private CreateOrGetTagCommandHandler CreateHandler() =>
-        new(_tagRepository, new TagNormalizationService(), _currentUserService, _dateTimeProvider);
+    private CreateOrGetTagCommandHandler CreateHandler()
+    {
+        return new CreateOrGetTagCommandHandler(_tagRepository, new TagNormalizationService(), _currentUserService,
+            _dateTimeProvider);
+    }
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()

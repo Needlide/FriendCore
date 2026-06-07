@@ -9,12 +9,14 @@ public class VerifyEmailCommandHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset Expires = Now.AddHours(24);
-
-    private readonly IEmailVerificationTokenRepository _tokenRepository = Substitute.For<IEmailVerificationTokenRepository>();
-    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
-    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
-    private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
+    private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
+    private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
+
+    private readonly IEmailVerificationTokenRepository _tokenRepository =
+        Substitute.For<IEmailVerificationTokenRepository>();
+
+    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
 
     public VerifyEmailCommandHandlerTests()
     {
@@ -24,13 +26,17 @@ public class VerifyEmailCommandHandlerTests
             .Returns(new AuthTokenResult("access-token", Now.AddHours(1)));
     }
 
-    private VerifyEmailCommandHandler CreateHandler() =>
-        new(_tokenRepository, _userRepository, _tokenHasher, _jwtTokenService, _dateTimeProvider);
+    private VerifyEmailCommandHandler CreateHandler()
+    {
+        return new VerifyEmailCommandHandler(_tokenRepository, _userRepository, _tokenHasher, _jwtTokenService,
+            _dateTimeProvider);
+    }
 
     [Fact]
     public async Task Handle_ReturnsInvalidToken_WhenTokenNotFound()
     {
-        _tokenRepository.GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+        _tokenRepository
+            .GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns((EmailVerificationToken?)null);
 
         var result = await CreateHandler().Handle(new VerifyEmailCommand("missing"), CancellationToken.None);
@@ -42,8 +48,11 @@ public class VerifyEmailCommandHandlerTests
     [Fact]
     public async Task Handle_ReturnsInvalidToken_WhenTokenExpired()
     {
-        var expired = EmailVerificationToken.Create(Ulid.NewUlid(), "hash::tok", Now.AddHours(-48), TimeSpan.FromHours(24));
-        _tokenRepository.GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(expired);
+        var expired =
+            EmailVerificationToken.Create(Ulid.NewUlid(), "hash::tok", Now.AddHours(-48), TimeSpan.FromHours(24));
+        _tokenRepository
+            .GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(expired);
 
         var result = await CreateHandler().Handle(new VerifyEmailCommand("tok"), CancellationToken.None);
 
@@ -55,7 +64,9 @@ public class VerifyEmailCommandHandlerTests
     public async Task Handle_ReturnsNotFound_WhenUserMissing()
     {
         var token = EmailVerificationToken.Create(Ulid.NewUlid(), "hash::tok", Now, TimeSpan.FromHours(24));
-        _tokenRepository.GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(token);
+        _tokenRepository
+            .GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(token);
         _userRepository.GetByIdAsync(token.UserId, Arg.Any<CancellationToken>()).Returns((User?)null);
 
         var result = await CreateHandler().Handle(new VerifyEmailCommand("tok"), CancellationToken.None);
@@ -69,7 +80,9 @@ public class VerifyEmailCommandHandlerTests
     {
         var user = UserTestFactory.CreateVerified();
         var token = EmailVerificationToken.Create(user.Id, "hash::tok", Now, TimeSpan.FromHours(24));
-        _tokenRepository.GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(token);
+        _tokenRepository
+            .GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(token);
         _userRepository.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         var result = await CreateHandler().Handle(new VerifyEmailCommand("tok"), CancellationToken.None);
@@ -83,7 +96,8 @@ public class VerifyEmailCommandHandlerTests
     {
         var user = UserTestFactory.Create();
         var token = EmailVerificationToken.Create(user.Id, "hash::tok", Now, TimeSpan.FromHours(24));
-        _tokenRepository.GetActiveByTokenHashAsync("hash::tok", Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(token);
+        _tokenRepository.GetActiveByTokenHashAsync("hash::tok", Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(token);
         _userRepository.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         var result = await CreateHandler().Handle(new VerifyEmailCommand("tok"), CancellationToken.None);
@@ -104,7 +118,9 @@ public class VerifyEmailCommandHandlerTests
     {
         var user = UserTestFactory.Create();
         var token = EmailVerificationToken.Create(user.Id, "hash::tok", Now, TimeSpan.FromHours(24));
-        _tokenRepository.GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(token);
+        _tokenRepository
+            .GetActiveByTokenHashAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(token);
         _userRepository.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         await CreateHandler().Handle(new VerifyEmailCommand("  tok  "), CancellationToken.None);
