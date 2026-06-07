@@ -19,7 +19,7 @@ public static class RateLimitingExtensions
                     context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
 
                 await context.HttpContext.Response.WriteAsJsonAsync(
-                    new { code = "Common.RateLimited", description = "Too many requests. Please try again later." },
+                    new { Code = "Common.RateLimited", Description = "Too many requests. Please try again later." },
                     cancellationToken);
             };
 
