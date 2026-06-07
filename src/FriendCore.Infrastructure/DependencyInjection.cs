@@ -1,5 +1,6 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Options;
+using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 using FriendCore.Infrastructure.Authentication;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IFollowRepository, FollowRepository>();
+        services.AddScoped<IPostRepository, PostRepository>();
         services.AddHostedService<TagMaintenanceService>();
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.AddSingleton<IEmailVerificationTokenHasher, EmailVerificationTokenHasher>();
