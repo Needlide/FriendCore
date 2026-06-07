@@ -126,6 +126,17 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         return true;
     }
 
+    public bool UpdateProfileTag(Ulid tagId, TagTier tier, bool isPublic, DateTimeOffset at)
+    {
+        var existing = _profileTags.FirstOrDefault(tag => tag.TagId == tagId);
+        if (existing is null)
+            return false;
+
+        existing.Update(tier, isPublic);
+        UpdatedAt = at;
+        return true;
+    }
+
     public ErrorOr<Success> MarkEmailVerified(DateTimeOffset verifiedAt)
     {
         if (IsVerified)

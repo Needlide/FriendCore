@@ -22,6 +22,67 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FriendCore.Domain.Tags.Tag", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedById")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTimeOffset>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PostCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_count");
+
+                    b.Property<int>("ProfileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("profile_count");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TotalCount");
+
+                    b.ToTable("tags", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.EmailVerificationToken", b =>
                 {
                     b.Property<string>("Id")
@@ -185,6 +246,40 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FriendCore.Domain.Users.User", b =>
                 {
+                    b.OwnsMany("FriendCore.Domain.Tags.ProfileTag", "ProfileTags", b1 =>
+                        {
+                            b1.Property<string>("UserId")
+                                .HasColumnType("text")
+                                .HasColumnName("user_id");
+
+                            b1.Property<string>("TagId")
+                                .HasColumnType("text")
+                                .HasColumnName("tag_id");
+
+                            b1.Property<DateTimeOffset>("AddedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("added_at");
+
+                            b1.Property<bool>("IsPublic")
+                                .HasColumnType("boolean")
+                                .HasColumnName("is_public");
+
+                            b1.Property<string>("Tier")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("tier");
+
+                            b1.HasKey("UserId", "TagId");
+
+                            b1.HasIndex("TagId");
+
+                            b1.ToTable("profile_tags", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId");
+                        });
+
                     b.OwnsOne("FriendCore.Domain.Users.UserProfile", "Profile", b1 =>
                         {
                             b1.Property<string>("UserId")
@@ -219,6 +314,8 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Profile")
                         .IsRequired();
+
+                    b.Navigation("ProfileTags");
                 });
 #pragma warning restore 612, 618
         }

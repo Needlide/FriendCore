@@ -83,5 +83,32 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             profile.Property(p => p.Location).HasColumnName("location").HasMaxLength(200);
             profile.Property(p => p.UsernameLastChangedAt).HasColumnName("username_last_changed_at");
         });
+
+        builder.OwnsMany(user => user.ProfileTags, profileTag =>
+        {
+            profileTag.ToTable("profile_tags");
+            profileTag.WithOwner().HasForeignKey(tag => tag.UserId);
+            profileTag.HasKey(tag => new { tag.UserId, tag.TagId });
+
+            profileTag.Property(tag => tag.UserId)
+                .HasColumnName("user_id")
+                .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
+
+            profileTag.Property(tag => tag.TagId)
+                .HasColumnName("tag_id")
+                .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
+
+            profileTag.HasIndex(tag => tag.TagId);
+
+            profileTag.Property(tag => tag.Tier)
+                .HasColumnName("tier")
+                .HasConversion<string>()
+                .HasMaxLength(16);
+
+            profileTag.Property(tag => tag.IsPublic).HasColumnName("is_public");
+            profileTag.Property(tag => tag.AddedAt).HasColumnName("added_at");
+        });
+
+        builder.Navigation(user => user.ProfileTags).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

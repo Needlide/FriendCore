@@ -23,4 +23,10 @@ public sealed class ProfileTag
             AddedAt = addedAt
         };
     }
+
+    internal void Update(TagTier tier, bool isPublic)
+    {
+        Tier = tier;
+        IsPublic = isPublic;
+    }
 }
