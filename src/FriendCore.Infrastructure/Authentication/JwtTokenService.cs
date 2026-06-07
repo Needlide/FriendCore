@@ -20,7 +20,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim("username", user.Username),
-            new Claim(ClaimTypes.Role, "User")
+            new Claim(ClaimTypes.Role, user.Role.ToString())
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));

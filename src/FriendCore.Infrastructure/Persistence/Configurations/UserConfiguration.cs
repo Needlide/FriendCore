@@ -58,6 +58,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasConversion<string>()
             .HasMaxLength(32);
 
+        builder.Property(user => user.Role)
+            .HasColumnName("role")
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
         builder.Property(user => user.IsVerified)
             .HasColumnName("is_verified");
 

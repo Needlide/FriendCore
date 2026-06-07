@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using FriendCore.API.Authorization;
 using FriendCore.API.Extensions;
+using FriendCore.Domain.Users;
 using FriendCore.Application;
 using FriendCore.Infrastructure;
 using FriendCore.Infrastructure.Authentication;
@@ -67,7 +69,17 @@ try
             };
         });
 
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy(AuthorizationPolicies.TagModeration, policy =>
+            policy.RequireRole(
+                nameof(UserRole.Moderator),
+                nameof(UserRole.SeniorModerator),
+                nameof(UserRole.Admin)));
+
+        options.AddPolicy(AuthorizationPolicies.Admin, policy =>
+            policy.RequireRole(nameof(UserRole.Admin)));
+    });
 
     var app = builder.Build();
 

@@ -28,6 +28,7 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public Ulid? AvatarMediaId { get; private set; }
     public UserProfile Profile { get; private set; } = null!;
     public ContentPreference ContentPreference { get; private set; }
+    public UserRole Role { get; private set; }
     public bool IsVerified { get; private set; }
     public bool IsBanned { get; private set; }
     public DateTimeOffset? LastActiveAt { get; private set; }
@@ -63,6 +64,7 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
             PasswordHash = passwordHash,
             Profile = UserProfile.Empty(),
             ContentPreference = ContentPreference.General,
+            Role = UserRole.User,
             UpdatedAt = createdAt,
             LastActiveAt = createdAt
         };
@@ -150,6 +152,11 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public void RecordLogin(DateTimeOffset at)
     {
         LastActiveAt = at;
+    }
+
+    public void AssignRole(UserRole role)
+    {
+        Role = role;
     }
 
     public static string ToUsernameSlug(string username)
