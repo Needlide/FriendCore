@@ -1,4 +1,5 @@
 using ErrorOr;
+using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -7,6 +8,7 @@ using MediatR;
 namespace FriendCore.Application.Posts.Queries.GetPost;
 
 internal sealed class GetPostQueryHandler(
+    ICurrentUserService currentUserService,
     IPostRepository postRepository,
     IUserRepository userRepository)
     : IRequestHandler<GetPostQuery, ErrorOr<PostResponse>>
@@ -21,6 +23,9 @@ internal sealed class GetPostQueryHandler(
         if (author is null)
             return PostErrors.NotFound;
 
-        return PostResponse.Create(post, author, isLikedByCurrentUser: false);
+        var isLiked = currentUserService.UserId is { } userId &&
+                      (await postRepository.GetLikedPostIdsAsync(userId, [post.Id], cancellationToken)).Count > 0;
+
+        return PostResponse.Create(post, author, isLiked);
     }
 }
