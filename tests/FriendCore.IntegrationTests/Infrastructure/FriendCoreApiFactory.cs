@@ -69,7 +69,9 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
                 ["Jwt:SecretKey"] = JwtSecret,
                 ["Jwt:Issuer"] = JwtIssuer,
                 ["Jwt:Audience"] = JwtAudience,
-                ["Jwt:AccessTokenExpirationMinutes"] = "60"
+                ["Jwt:AccessTokenExpirationMinutes"] = "60",
+                // Small batch so the auto-archive drain loop crosses multiple batches in tests.
+                ["TagMaintenance:ArchiveBatchSize"] = "3"
             });
         });
 

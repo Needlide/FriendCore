@@ -14,6 +14,7 @@ using FriendCore.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace FriendCore.Infrastructure;
@@ -26,6 +27,7 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<TagMaintenanceOptions>(configuration.GetSection(TagMaintenanceOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
@@ -44,12 +46,23 @@ public static class DependencyInjection
         services.AddSingleton<AuditInterceptor>();
         services.AddSingleton<SoftDeleteInterceptor>();
 
+        var logSql = configuration.GetValue<bool>("Database:LogSql");
+
         services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
             options.UseNpgsql(configuration.GetConnectionString("Database"));
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<AuditInterceptor>(),
                 serviceProvider.GetRequiredService<SoftDeleteInterceptor>());
+
+            // Dev-only: dump the executed SQL (with parameter values) so queries can be copied
+            // into EXPLAIN. EnableSensitiveDataLogging inlines parameters, so never enable in prod.
+            if (logSql)
+            {
+                options.LogTo(Console.WriteLine, new[] { DbLoggerCategory.Database.Command.Name },
+                    LogLevel.Information);
+                options.EnableSensitiveDataLogging();
+            }
         });
 
         var healthChecks = services.AddHealthChecks();

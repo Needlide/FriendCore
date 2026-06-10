@@ -44,6 +44,7 @@ public sealed class FollowRepository(AppDbContext context) : IFollowRepository
                 orderby follow.CreatedAt descending
                 select user)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
@@ -59,6 +60,7 @@ public sealed class FollowRepository(AppDbContext context) : IFollowRepository
                 orderby follow.CreatedAt descending
                 select user)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 }

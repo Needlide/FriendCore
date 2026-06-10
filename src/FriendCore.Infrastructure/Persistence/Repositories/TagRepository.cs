@@ -46,6 +46,7 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
             .OrderByDescending(tag => tag.TotalCount)
             .ThenBy(tag => tag.Slug)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
@@ -58,12 +59,14 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
             .Where(tag => tag.Status == status)
             .OrderBy(tag => tag.CreatedAt)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Tag>> GetArchivableAsync(
         int maxProfileCountExclusive,
         DateTimeOffset lastUsedBefore,
+        int batchSize,
         CancellationToken cancellationToken = default)
     {
         return await context.Tags
@@ -71,6 +74,8 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
                 (tag.Status == TagStatus.Active || tag.Status == TagStatus.PendingReview) &&
                 tag.ProfileCount < maxProfileCountExclusive &&
                 tag.LastUsedAt < lastUsedBefore)
+            .OrderBy(tag => tag.LastUsedAt)
+            .Take(batchSize)
             .ToListAsync(cancellationToken);
     }
 
@@ -78,6 +83,11 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
     {
         await context.Tags.AddAsync(tag, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddRangeAsync(IEnumerable<Tag> tags, CancellationToken cancellationToken = default)
+    {
+        await context.Tags.AddRangeAsync(tags, cancellationToken);
     }
 
     public Task UpdateAsync(CancellationToken cancellationToken = default)

@@ -20,7 +20,7 @@ public sealed class CommentConfiguration : IEntityTypeConfiguration<Comment>
             .HasColumnName("post_id")
             .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
 
-        builder.HasIndex(comment => comment.PostId);
+        builder.HasIndex(comment => comment.PostId).HasFilter("deleted_at IS NULL");
 
         builder.Property(comment => comment.AuthorId)
             .HasColumnName("author_id")
@@ -33,5 +33,10 @@ public sealed class CommentConfiguration : IEntityTypeConfiguration<Comment>
 
         builder.Property(comment => comment.CreatedAt).HasColumnName("created_at");
         builder.Property(comment => comment.DeletedAt).HasColumnName("deleted_at");
+
+        // Id trails the sort columns so the keyset (ORDER BY created_at DESC, id DESC) is fully
+        // index-ordered even across comments that share a created_at.
+        builder.HasIndex(comment => new { comment.PostId, comment.CreatedAt, comment.Id })
+            .HasFilter("deleted_at IS NULL");
     }
 }

@@ -29,6 +29,7 @@ public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
             .IsRequired();
 
         builder.HasIndex(tag => tag.Slug).IsUnique();
+        builder.HasIndex(tag => tag.Slug).HasOperators("text_pattern_ops");
 
         builder.Property(tag => tag.Status)
             .HasColumnName("status")
@@ -51,6 +52,9 @@ public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
 
         builder.Property(tag => tag.LastUsedAt)
             .HasColumnName("last_used_at");
+
+        // Serves the auto-archive sweep: status IN (...) AND profile_count < 3 AND last_used_at < cutoff.
+        builder.HasIndex(tag => new { tag.Status, tag.LastUsedAt });
 
         builder.Property(tag => tag.ProfileCount)
             .HasColumnName("profile_count");

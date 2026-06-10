@@ -13,16 +13,18 @@ public class GetHomeFeedQueryHandlerTests
 
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
-    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly Ulid _userId = Ulid.NewUlid();
+    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
 
     public GetHomeFeedQueryHandlerTests()
     {
         _currentUserService.UserId.Returns(_userId);
     }
 
-    private GetHomeFeedQueryHandler CreateHandler() =>
-        new(_currentUserService, _postRepository, _userRepository);
+    private GetHomeFeedQueryHandler CreateHandler()
+    {
+        return new GetHomeFeedQueryHandler(_currentUserService, _postRepository, _userRepository);
+    }
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -38,14 +40,16 @@ public class GetHomeFeedQueryHandlerTests
     [Fact]
     public async Task Handle_MapsPostsWithAuthorsAndLikedFlags()
     {
-        var author = UserTestFactory.Create(username: "bob");
+        var author = UserTestFactory.Create("bob");
         var post = Post.Create(author.Id, "hello", ContentSensitivity.General, Now).Value;
 
-        _postRepository.GetHomeFeedAsync(_userId, Arg.Any<DateTimeOffset?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _postRepository.GetHomeFeedAsync(
+                _userId, Arg.Any<(DateTimeOffset, Ulid)?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([post]);
         _userRepository.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([author]);
-        _postRepository.GetLikedPostIdsAsync(_userId, Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+        _postRepository
+            .GetLikedPostIdsAsync(_userId, Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([post.Id]);
 
         var result = await CreateHandler().Handle(new GetHomeFeedQuery(null), CancellationToken.None);

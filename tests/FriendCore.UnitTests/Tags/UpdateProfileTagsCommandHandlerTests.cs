@@ -78,7 +78,8 @@ public class UpdateProfileTagsCommandHandlerTests
         Assert.False(result.IsError);
         Assert.Equal(2, result.Value.Tags.Count);
         Assert.Equal(2, _user.ProfileTags.Count);
-        await _tagRepository.Received(2).AddAsync(Arg.Any<Tag>(), Arg.Any<CancellationToken>());
+        await _tagRepository.Received(1)
+            .AddRangeAsync(Arg.Is<IEnumerable<Tag>>(tags => tags.Count() == 2), Arg.Any<CancellationToken>());
         await _userRepository.Received(1).UpdateAsync(_user, Arg.Any<CancellationToken>());
         Assert.Contains(result.Value.Tags, t => t.Slug == "photography" && t.Tier == "Primary" && t.IsPublic);
         Assert.Contains(result.Value.Tags, t => t.Slug == "indie-game-dev" && t.Tier == "Secondary" && !t.IsPublic);
@@ -95,7 +96,7 @@ public class UpdateProfileTagsCommandHandlerTests
             CancellationToken.None);
 
         Assert.False(result.IsError);
-        await _tagRepository.DidNotReceive().AddAsync(Arg.Any<Tag>(), Arg.Any<CancellationToken>());
+        await _tagRepository.DidNotReceive().AddRangeAsync(Arg.Any<IEnumerable<Tag>>(), Arg.Any<CancellationToken>());
         Assert.Equal(1, existing.ProfileCount);
         Assert.Equal(existing.Id.ToString(), Assert.Single(result.Value.Tags).TagId);
     }

@@ -39,6 +39,8 @@ public sealed class EmailVerificationTokenConfiguration : IEntityTypeConfigurati
         builder.Property(token => token.ConsumedAt)
             .HasColumnName("consumed_at");
 
+        builder.HasIndex(token => token.TokenHash).HasFilter("consumed_at IS NULL");
+
         builder.Property(token => token.CreatedAt)
             .HasColumnName("created_at");
     }

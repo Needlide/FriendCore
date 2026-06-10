@@ -20,9 +20,10 @@ public sealed class FollowConfiguration : IEntityTypeConfiguration<Follow>
             .HasColumnName("followed_id")
             .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
 
-        builder.HasIndex(follow => follow.FollowedId);
-
         builder.Property(follow => follow.CreatedAt)
             .HasColumnName("created_at");
+
+        builder.HasIndex(follow => new { follow.FollowedId, follow.CreatedAt });
+        builder.HasIndex(follow => new { follow.FollowerId, follow.CreatedAt });
     }
 }

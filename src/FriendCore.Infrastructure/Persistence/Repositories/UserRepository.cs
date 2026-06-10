@@ -39,7 +39,7 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         if (ids.Count == 0)
             return [];
 
-        return await context.Users.Where(user => ids.Contains(user.Id)).ToListAsync(cancellationToken);
+        return await context.Users.Where(user => ids.Contains(user.Id)).AsNoTracking().ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(

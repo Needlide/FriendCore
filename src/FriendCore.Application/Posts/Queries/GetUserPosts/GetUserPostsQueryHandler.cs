@@ -35,7 +35,7 @@ internal sealed class GetUserPostsQueryHandler(
         var items = page
             .Select(post => PostResponse.Create(post, user, likedPostIds.Contains(post.Id)))
             .ToList();
-        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt) : null;
+        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 
         return new PostFeedResponse(items, nextCursor);
     }

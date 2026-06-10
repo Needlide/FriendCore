@@ -12,14 +12,14 @@ public interface IPostRepository
 
     Task<IReadOnlyList<Post>> GetByAuthorAsync(
         Ulid authorId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default);
 
     // Posts authored by users the given user follows, newest first.
     Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default);
 
@@ -44,7 +44,7 @@ public interface IPostRepository
 
     Task<IReadOnlyList<Comment>> GetCommentsByPostAsync(
         Ulid postId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default);
 }

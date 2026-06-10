@@ -85,15 +85,33 @@ public class TagModerationFlowTests(FriendCoreApiFactory factory) : IClassFixtur
         await _scenarios.SeedStaleActiveTagAsync("Stale Tag", slug);
 
         var moderator = await ClientFor(AuthScenarios.UniqueEmail(), UserRole.Moderator);
-        var forbidden = await moderator.PostAsync("/api/v1/tags/moderation/auto-archive", content: null);
+        var forbidden = await moderator.PostAsync("/api/v1/tags/moderation/auto-archive", null);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
 
         var admin = await ClientFor(AuthScenarios.UniqueEmail(), UserRole.Admin);
-        var response = await admin.PostAsync("/api/v1/tags/moderation/auto-archive", content: null);
+        var response = await admin.PostAsync("/api/v1/tags/moderation/auto-archive", null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<StaleTagsArchivedResponse>();
         Assert.True(body!.ArchivedCount >= 1);
         await _scenarios.AssertTag(slug, tag => Assert.Equal(TagStatus.Archived, tag.Status));
+    }
+
+    [Fact]
+    public async Task AutoArchive_DrainsAllStaleTags_AcrossMultipleBatches()
+    {
+        // Seed more stale tags than the test batch size (3, set in the factory) so the sweep must
+        // loop. A non-looping single-batch implementation would leave the overflow tags Active.
+        var slugs = await _scenarios.SeedStaleActiveTagsAsync(7, "drain");
+
+        var admin = await ClientFor(AuthScenarios.UniqueEmail(), UserRole.Admin);
+        var response = await admin.PostAsync("/api/v1/tags/moderation/auto-archive", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<StaleTagsArchivedResponse>();
+        Assert.True(body!.ArchivedCount >= slugs.Count);
+
+        foreach (var slug in slugs)
+            await _scenarios.AssertTag(slug, tag => Assert.Equal(TagStatus.Archived, tag.Status));
     }
 }

@@ -53,6 +53,38 @@ public class AuthScenarios(FriendCoreApiFactory factory)
         assert(user);
     }
 
+    public async Task<Ulid> GetUserIdAsync(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.Email == email);
+        return user.Id;
+    }
+
+    // Insert posts that all share the exact same CreatedAt (distinct Ulids) via raw SQL — the
+    // AuditInterceptor would otherwise stamp CreatedAt = UtcNow and we could never force a tie.
+    // Returns the generated ids so a keyset test can assert ordering by the Id tiebreaker.
+    public async Task<IReadOnlyList<Ulid>> SeedPostsWithSameTimestampAsync(
+        Ulid authorId,
+        int count,
+        DateTimeOffset createdAt)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ids = new List<Ulid>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var id = Ulid.NewUlid();
+            ids.Add(id);
+            await db.Database.ExecuteSqlInterpolatedAsync($@"
+INSERT INTO posts (id, author_id, content, sensitivity, like_count, comment_count, updated_at, deleted_at, created_at)
+VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"}, 0, 0, {createdAt}, NULL, {createdAt})");
+        }
+
+        return ids;
+    }
+
     // No domain ban API exists yet; the IsBanned setter is private. Flip it via
     // reflection then persist so the AccountBanned path stays covered. Replace
     // with a real User.Ban(...) call once the moderation phase adds one.
@@ -104,6 +136,26 @@ public class AuthScenarios(FriendCoreApiFactory factory)
         tag.Approve();
         db.Tags.Add(tag);
         await db.SaveChangesAsync();
+    }
+
+    // Seed several stale Active tags in one round-trip; returns their slugs.
+    public async Task<IReadOnlyList<string>> SeedStaleActiveTagsAsync(int count, string slugPrefix)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var slugs = new List<string>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var slug = $"{slugPrefix}-{i}-{Ulid.NewUlid().ToString().ToLowerInvariant()[..8]}";
+            var tag = Tag.Create($"Stale {i}", slug, Ulid.NewUlid(), DateTimeOffset.UtcNow.AddDays(-200));
+            tag.Approve();
+            db.Tags.Add(tag);
+            slugs.Add(slug);
+        }
+
+        await db.SaveChangesAsync();
+        return slugs;
     }
 
     public async Task AssertTag(string slug, Action<Tag> assert)

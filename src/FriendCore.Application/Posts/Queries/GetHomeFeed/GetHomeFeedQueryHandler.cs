@@ -34,7 +34,8 @@ internal sealed class GetHomeFeedQueryHandler(
 
         var likedPostIds = page.Count == 0
             ? []
-            : (await postRepository.GetLikedPostIdsAsync(userId, page.Select(post => post.Id).ToList(), cancellationToken))
+            : (await postRepository.GetLikedPostIdsAsync(userId, page.Select(post => post.Id).ToList(),
+                cancellationToken))
             .ToHashSet();
 
         var items = page
@@ -42,7 +43,7 @@ internal sealed class GetHomeFeedQueryHandler(
             .Select(post => PostResponse.Create(post, authors[post.AuthorId], likedPostIds.Contains(post.Id)))
             .ToList();
 
-        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt) : null;
+        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
         return new PostFeedResponse(items, nextCursor);
     }
 }

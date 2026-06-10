@@ -37,7 +37,7 @@ internal sealed class GetPostCommentsQueryHandler(
             .Select(comment => CommentResponse.Create(comment, authors[comment.AuthorId]))
             .ToList();
 
-        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt) : null;
+        var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
         return new CommentFeedResponse(items, nextCursor);
     }
 }

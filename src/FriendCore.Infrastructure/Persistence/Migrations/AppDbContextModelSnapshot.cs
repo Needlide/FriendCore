@@ -54,7 +54,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PostId");
+                    b.HasIndex("PostId")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("PostId", "CreatedAt", "Id")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("comments", (string)null);
                 });
@@ -124,7 +128,14 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorId");
+                    b.HasIndex("AuthorId")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("CreatedAt", "Id")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("AuthorId", "CreatedAt", "Id")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("posts", (string)null);
                 });
@@ -187,9 +198,13 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.HasIndex("Slug")
                         .IsUnique();
 
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Slug"), new[] { "text_pattern_ops" });
+
                     b.HasIndex("Status");
 
                     b.HasIndex("TotalCount");
+
+                    b.HasIndex("Status", "LastUsedAt");
 
                     b.ToTable("tags", (string)null);
                 });
@@ -226,7 +241,8 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TokenHash")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("consumed_at IS NULL");
 
                     b.HasIndex("UserId");
 
@@ -249,7 +265,9 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.HasKey("FollowerId", "FollowedId");
 
-                    b.HasIndex("FollowedId");
+                    b.HasIndex("FollowedId", "CreatedAt");
+
+                    b.HasIndex("FollowerId", "CreatedAt");
 
                     b.ToTable("follows", (string)null);
                 });

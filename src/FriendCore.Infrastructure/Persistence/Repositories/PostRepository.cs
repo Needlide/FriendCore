@@ -30,24 +30,28 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
 
     public async Task<IReadOnlyList<Post>> GetByAuthorAsync(
         Ulid authorId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default)
     {
         var query = context.Posts.Where(post => post.AuthorId == authorId);
 
         if (cursor is { } before)
-            query = query.Where(post => post.CreatedAt < before);
+            query = query.Where(post =>
+                post.CreatedAt < before.CreatedAt ||
+                (post.CreatedAt == before.CreatedAt && post.Id.CompareTo(before.Id) < 0));
 
         return await query
             .OrderByDescending(post => post.CreatedAt)
+            .ThenByDescending(post => post.Id)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default)
     {
@@ -55,11 +59,15 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             context.Follows.Any(follow => follow.FollowerId == userId && follow.FollowedId == post.AuthorId));
 
         if (cursor is { } before)
-            query = query.Where(post => post.CreatedAt < before);
+            query = query.Where(post =>
+                post.CreatedAt < before.CreatedAt ||
+                (post.CreatedAt == before.CreatedAt && post.Id.CompareTo(before.Id) < 0));
 
         return await query
             .OrderByDescending(post => post.CreatedAt)
+            .ThenByDescending(post => post.Id)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
@@ -100,6 +108,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
 
         return await context.Likes
             .Where(like => like.UserId == userId && postIds.Contains(like.PostId))
+            .AsNoTracking()
             .Select(like => like.PostId)
             .ToListAsync(cancellationToken);
     }
@@ -123,18 +132,22 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
 
     public async Task<IReadOnlyList<Comment>> GetCommentsByPostAsync(
         Ulid postId,
-        DateTimeOffset? cursor,
+        (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default)
     {
         var query = context.Comments.Where(comment => comment.PostId == postId);
 
         if (cursor is { } before)
-            query = query.Where(comment => comment.CreatedAt < before);
+            query = query.Where(comment =>
+                comment.CreatedAt < before.CreatedAt ||
+                (comment.CreatedAt == before.CreatedAt && comment.Id.CompareTo(before.Id) < 0));
 
         return await query
             .OrderByDescending(comment => comment.CreatedAt)
+            .ThenByDescending(comment => comment.Id)
             .Take(limit)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 }

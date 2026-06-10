@@ -64,6 +64,8 @@ internal sealed class UpdateProfileTagsCommandHandler(
         var seenSlugs = new HashSet<string>();
         var seenTagIds = new HashSet<Ulid>();
 
+        List<Tag> newTags = [];
+
         foreach (var input in inputs)
         {
             var normalized = normalizer.Normalize(input.Name);
@@ -78,7 +80,7 @@ internal sealed class UpdateProfileTagsCommandHandler(
             if (tag is null)
             {
                 tag = Tag.Create(normalized.Value.DisplayName, normalized.Value.Slug, userId, now);
-                await tagRepository.AddAsync(tag, cancellationToken);
+                newTags.Add(tag);
             }
 
             if (!tag.IsAttachable)
@@ -90,6 +92,11 @@ internal sealed class UpdateProfileTagsCommandHandler(
 
             assignments.Add(new TagAssignment(tag, input.Tier, input.IsPublic));
         }
+
+        if (newTags.Count <= 0) return assignments;
+
+        await tagRepository.AddRangeAsync(newTags, cancellationToken);
+        await tagRepository.UpdateAsync(cancellationToken);
 
         return assignments;
     }
