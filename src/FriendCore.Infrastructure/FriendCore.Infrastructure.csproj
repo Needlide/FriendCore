@@ -7,27 +7,29 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\FriendCore.Application\FriendCore.Application.csproj"/>
-        <ProjectReference Include="..\FriendCore.Domain\FriendCore.Domain.csproj"/>
+        <ProjectReference Include="..\FriendCore.Application\FriendCore.Application.csproj" />
+        <ProjectReference Include="..\FriendCore.Domain\FriendCore.Domain.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0"/>
-        <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.6"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.6"/>
+        <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+        <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.24.3" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.6" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.6" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.6">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2"/>
-        <PackageReference Include="StackExchange.Redis" Version="2.8.16"/>
-        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3"/>
-        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+        <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     </ItemGroup>
 
 </Project>

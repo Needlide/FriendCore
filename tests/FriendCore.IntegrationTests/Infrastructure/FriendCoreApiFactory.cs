@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Testcontainers.Minio;
 using Testcontainers.PostgreSql;
 
 namespace FriendCore.IntegrationTests.Infrastructure;
@@ -21,9 +22,17 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
     private const string JwtSecret = "integration-tests-secret-key-that-is-long-enough-32+";
     private const string JwtIssuer = "FriendCore.Tests";
     private const string JwtAudience = "FriendCore.Tests";
+    private const string StorageAccessKey = "minio";
+    private const string StorageSecretKey = "minio-secret-key";
+    private const string StorageBucket = "friendcore-media-tests";
 
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
+        .Build();
+
+    private readonly MinioContainer _storage = new MinioBuilder()
+        .WithUsername(StorageAccessKey)
+        .WithPassword(StorageSecretKey)
         .Build();
 
     public FriendCoreApiFactory()
@@ -43,7 +52,7 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
 
     async Task IAsyncLifetime.InitializeAsync()
     {
-        await _database.StartAsync();
+        await Task.WhenAll(_database.StartAsync(), _storage.StartAsync());
 
         // Accessing Services builds the host (running ConfigureWebHost above) so migrations target
         // the container.
@@ -54,6 +63,7 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _database.DisposeAsync();
+        await _storage.DisposeAsync();
         await base.DisposeAsync();
     }
 
@@ -71,7 +81,19 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
                 ["Jwt:Audience"] = JwtAudience,
                 ["Jwt:AccessTokenExpirationMinutes"] = "60",
                 // Small batch so the auto-archive drain loop crosses multiple batches in tests.
-                ["TagMaintenance:ArchiveBatchSize"] = "3"
+                ["TagMaintenance:ArchiveBatchSize"] = "3",
+                ["Storage:Endpoint"] = _storage.GetConnectionString(),
+                ["Storage:Bucket"] = StorageBucket,
+                ["Storage:AccessKey"] = StorageAccessKey,
+                ["Storage:SecretKey"] = StorageSecretKey,
+                ["Storage:PublicBaseUrl"] = $"{_storage.GetConnectionString()}/{StorageBucket}",
+                // Exercises StorageBucketInitializer on every host start (and its idempotence).
+                ["Storage:EnsureBucketExists"] = "true",
+                // Fast sweeps so tests can observe restart recovery without waiting, but a real
+                // stuck threshold: only items with a backdated CreatedAt are swept, so freshly
+                // created Processing fixtures in other tests are never picked up mid-assertion.
+                ["MediaProcessing:SweepIntervalSeconds"] = "1",
+                ["MediaProcessing:StuckAfterMinutes"] = "30"
             });
         });
 
