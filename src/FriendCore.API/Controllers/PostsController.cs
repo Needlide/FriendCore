@@ -1,5 +1,6 @@
 using FriendCore.API.Contracts.Posts;
 using FriendCore.API.Extensions;
+using FriendCore.Application.Common.Models;
 using FriendCore.Application.Posts.Commands.AddComment;
 using FriendCore.Application.Posts.Commands.CreatePost;
 using FriendCore.Application.Posts.Commands.DeleteComment;
@@ -75,7 +76,7 @@ public sealed class PostsController(ISender sender) : ControllerBase
 
     [HttpPost("{id}/like")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(PostLikeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Like(string id, CancellationToken cancellationToken)
@@ -84,12 +85,12 @@ public sealed class PostsController(ISender sender) : ControllerBase
             return NotFound();
 
         var result = await sender.Send(new LikePostCommand(postId), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+        return result.ToActionResult();
     }
 
     [HttpDelete("{id}/like")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(PostLikeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Unlike(string id, CancellationToken cancellationToken)
@@ -98,7 +99,7 @@ public sealed class PostsController(ISender sender) : ControllerBase
             return NotFound();
 
         var result = await sender.Send(new UnlikePostCommand(postId), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+        return result.ToActionResult();
     }
 
     [HttpPost("{id}/comments")]

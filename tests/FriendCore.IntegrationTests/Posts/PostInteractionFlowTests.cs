@@ -34,14 +34,20 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
         var postId = await CreatePost(client);
 
         var like = await client.PostAsync($"/api/v1/posts/{postId}/like", content: null);
-        Assert.Equal(HttpStatusCode.NoContent, like.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, like.StatusCode);
+        var likeBody = await like.Content.ReadFromJsonAsync<PostLikeResponse>();
+        Assert.True(likeBody!.Liked);
+        Assert.Equal(1, likeBody.LikeCount);
 
         var liked = await client.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
         Assert.Equal(1, liked!.LikeCount);
         Assert.True(liked.IsLikedByCurrentUser);
 
         var unlike = await client.DeleteAsync($"/api/v1/posts/{postId}/like");
-        Assert.Equal(HttpStatusCode.NoContent, unlike.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, unlike.StatusCode);
+        var unlikeBody = await unlike.Content.ReadFromJsonAsync<PostLikeResponse>();
+        Assert.False(unlikeBody!.Liked);
+        Assert.Equal(0, unlikeBody.LikeCount);
 
         var unliked = await client.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
         Assert.Equal(0, unliked!.LikeCount);
@@ -55,7 +61,12 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
         var postId = await CreatePost(client);
 
         await client.PostAsync($"/api/v1/posts/{postId}/like", content: null);
-        await client.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+        var second = await client.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+
+        // The repeated like is a no-op but still reports the stable authoritative state.
+        var secondBody = await second.Content.ReadFromJsonAsync<PostLikeResponse>();
+        Assert.True(secondBody!.Liked);
+        Assert.Equal(1, secondBody.LikeCount);
 
         var post = await client.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
         Assert.Equal(1, post!.LikeCount);

@@ -45,6 +45,8 @@ public class PostInteractionHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(1, post.LikeCount);
+        Assert.True(result.Value.Liked);
+        Assert.Equal(1, result.Value.LikeCount);
         await _postRepository.Received(1).AddLikeAsync(
             Arg.Is<Like>(l => l.PostId == post.Id && l.UserId == _user.Id),
             Arg.Any<CancellationToken>());
@@ -61,6 +63,8 @@ public class PostInteractionHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(0, post.LikeCount);
+        Assert.True(result.Value.Liked);
+        Assert.Equal(0, result.Value.LikeCount);
         await _postRepository.DidNotReceive().AddLikeAsync(Arg.Any<Like>(), Arg.Any<CancellationToken>());
     }
 
@@ -76,6 +80,8 @@ public class PostInteractionHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(0, post.LikeCount);
+        Assert.False(result.Value.Liked);
+        Assert.Equal(0, result.Value.LikeCount);
         await _postRepository.Received(1).RemoveLikeAsync(post.Id, _user.Id, Arg.Any<CancellationToken>());
     }
 

@@ -1,5 +1,6 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Posts;
 using MediatR;
@@ -10,9 +11,9 @@ internal sealed class LikePostCommandHandler(
     ICurrentUserService currentUserService,
     IPostRepository postRepository,
     IDateTimeProvider dateTimeProvider)
-    : IRequestHandler<LikePostCommand, ErrorOr<Success>>
+    : IRequestHandler<LikePostCommand, ErrorOr<PostLikeResponse>>
 {
-    public async Task<ErrorOr<Success>> Handle(LikePostCommand request, CancellationToken cancellationToken)
+    public async Task<ErrorOr<PostLikeResponse>> Handle(LikePostCommand request, CancellationToken cancellationToken)
     {
         if (currentUserService.UserId is not { } userId)
             return CommonErrors.Unauthorized;
@@ -21,12 +22,12 @@ internal sealed class LikePostCommandHandler(
         if (post is null)
             return PostErrors.NotFound;
 
-        // Idempotent: liking an already-liked post is a no-op.
+        // Idempotent: liking an already-liked post is a no-op but still returns current state.
         if (await postRepository.LikeExistsAsync(post.Id, userId, cancellationToken))
-            return Result.Success;
+            return new PostLikeResponse(true, post.LikeCount);
 
         post.IncrementLikeCount();
         await postRepository.AddLikeAsync(Like.Create(post.Id, userId, dateTimeProvider.UtcNow), cancellationToken);
-        return Result.Success;
+        return new PostLikeResponse(true, post.LikeCount);
     }
 }
