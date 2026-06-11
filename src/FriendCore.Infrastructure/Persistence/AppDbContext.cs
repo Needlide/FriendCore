@@ -1,5 +1,6 @@
 using System.Reflection;
 using FriendCore.Domain.Common;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
@@ -17,6 +18,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<MediaItem> MediaItems => Set<MediaItem>();
+    public DbSet<PostMedia> PostMedia => Set<PostMedia>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
