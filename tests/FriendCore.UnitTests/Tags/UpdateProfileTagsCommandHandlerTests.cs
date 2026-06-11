@@ -46,7 +46,7 @@ public class UpdateProfileTagsCommandHandlerTests
         _currentUserService.UserId.Returns((Ulid?)null);
 
         var result = await CreateHandler().Handle(
-            Command(new ProfileTagInput("Photography", TagTier.Primary, true)),
+            Command(new ProfileTagInput("Photography", ProfileTagTier.Primary, true)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -59,7 +59,7 @@ public class UpdateProfileTagsCommandHandlerTests
         _userRepository.GetByIdAsync(_user.Id, Arg.Any<CancellationToken>()).Returns((User?)null);
 
         var result = await CreateHandler().Handle(
-            Command(new ProfileTagInput("Photography", TagTier.Primary, true)),
+            Command(new ProfileTagInput("Photography", ProfileTagTier.Primary, true)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -71,8 +71,8 @@ public class UpdateProfileTagsCommandHandlerTests
     {
         var result = await CreateHandler().Handle(
             Command(
-                new ProfileTagInput("Photography", TagTier.Primary, true),
-                new ProfileTagInput("Indie Game Dev", TagTier.Secondary, false)),
+                new ProfileTagInput("Photography", ProfileTagTier.Primary, true),
+                new ProfileTagInput("Indie Game Dev", ProfileTagTier.Secondary, false)),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -92,7 +92,7 @@ public class UpdateProfileTagsCommandHandlerTests
         _tagRepository.GetBySlugResolvingAliasAsync("photography", Arg.Any<CancellationToken>()).Returns(existing);
 
         var result = await CreateHandler().Handle(
-            Command(new ProfileTagInput("photography", TagTier.Primary, true)),
+            Command(new ProfileTagInput("photography", ProfileTagTier.Primary, true)),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -106,8 +106,8 @@ public class UpdateProfileTagsCommandHandlerTests
     {
         var result = await CreateHandler().Handle(
             Command(
-                new ProfileTagInput("Photography", TagTier.Primary, true),
-                new ProfileTagInput("  photography ", TagTier.Secondary, false)),
+                new ProfileTagInput("Photography", ProfileTagTier.Primary, true),
+                new ProfileTagInput("  photography ", ProfileTagTier.Secondary, false)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -118,7 +118,7 @@ public class UpdateProfileTagsCommandHandlerTests
     public async Task Handle_RejectsTooManyPrimaryTags()
     {
         var inputs = Enumerable.Range(0, TagLimits.MaxPrimaryProfileTags + 1)
-            .Select(i => new ProfileTagInput($"tag number {i}", TagTier.Primary, true))
+            .Select(i => new ProfileTagInput($"tag number {i}", ProfileTagTier.Primary, true))
             .ToArray();
 
         var result = await CreateHandler().Handle(Command(inputs), CancellationToken.None);

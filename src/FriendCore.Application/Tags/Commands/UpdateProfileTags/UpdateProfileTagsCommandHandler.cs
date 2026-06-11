@@ -90,7 +90,7 @@ internal sealed class UpdateProfileTagsCommandHandler(
             if (!seenTagIds.Add(tag.Id))
                 return TagErrors.Duplicate;
 
-            assignments.Add(new TagAssignment(tag, input.Tier, input.IsPublic));
+            assignments.Add(new TagAssignment(tag, MapTier(input.Tier), input.IsPublic));
         }
 
         if (newTags.Count <= 0) return assignments;
@@ -131,6 +131,15 @@ internal sealed class UpdateProfileTagsCommandHandler(
             assignment.Tag.RecordProfileAdded(now);
         }
     }
+
+    // Out-of-range values are rejected by the validator's IsInEnum before the handler runs.
+    private static TagTier MapTier(ProfileTagTier tier) =>
+        tier switch
+        {
+            ProfileTagTier.Primary => TagTier.Primary,
+            ProfileTagTier.Secondary => TagTier.Secondary,
+            _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, null)
+        };
 
     private sealed record TagAssignment(Tag Tag, TagTier Tier, bool IsPublic);
 }
