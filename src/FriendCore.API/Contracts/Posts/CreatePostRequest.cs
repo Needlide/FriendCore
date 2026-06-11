@@ -1,5 +1,8 @@
-using FriendCore.Domain.Posts;
+using FriendCore.Application.Posts.Commands.CreatePost;
 
 namespace FriendCore.API.Contracts.Posts;
 
-public sealed record CreatePostRequest(string? Content, ContentSensitivity Sensitivity);
+public sealed record CreatePostRequest(
+    string? Content,
+    PostSensitivity Sensitivity,
+    IReadOnlyList<string>? MediaIds = null);

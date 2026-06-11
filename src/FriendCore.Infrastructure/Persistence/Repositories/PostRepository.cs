@@ -7,7 +7,9 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
 {
     public Task<Post?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default)
     {
-        return context.Posts.FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
+        return context.Posts
+            .Include(post => post.Media)
+            .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
     }
 
     public async Task AddAsync(Post post, CancellationToken cancellationToken = default)
@@ -45,6 +47,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             .OrderByDescending(post => post.CreatedAt)
             .ThenByDescending(post => post.Id)
             .Take(limit)
+            .Include(post => post.Media)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -67,6 +70,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             .OrderByDescending(post => post.CreatedAt)
             .ThenByDescending(post => post.Id)
             .Take(limit)
+            .Include(post => post.Media)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -110,6 +114,21 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             .Where(like => like.UserId == userId && postIds.Contains(like.PostId))
             .AsNoTracking()
             .Select(like => like.PostId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Ulid>> GetAttachedMediaIdsAsync(
+        IReadOnlyCollection<Ulid> mediaIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (mediaIds.Count == 0)
+            return [];
+
+        // PostMedia has no soft-delete filter, so attachments to soft-deleted posts count too —
+        // matching the unique index, which spans them.
+        return await context.PostMedia
+            .Where(postMedia => mediaIds.Contains(postMedia.MediaItemId))
+            .Select(postMedia => postMedia.MediaItemId)
             .ToListAsync(cancellationToken);
     }
 

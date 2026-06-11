@@ -6,11 +6,21 @@ public static class PostErrors
 {
     public const int MaxContentLength = 5000;
 
+    // Not in the spec — a deliberate MVP cap (Twitter-style); raise the constant if needed.
+    public const int MaxMediaPerPost = 4;
+
     public static Error NotFound =>
         Error.NotFound("Post.NotFound", "Post was not found.");
 
-    public static Error ContentRequired =>
-        Error.Validation("Post.ContentRequired", "Post content is required.");
+    // §5.3: Content is nullable so posts can be image-only — but never both empty.
+    public static Error ContentOrMediaRequired =>
+        Error.Validation("Post.ContentOrMediaRequired", "A post needs text content or at least one media item.");
+
+    public static Error TooManyMedia =>
+        Error.Validation("Post.TooManyMedia", $"A post can have at most {MaxMediaPerPost} media items.");
+
+    public static Error DuplicateMedia =>
+        Error.Validation("Post.DuplicateMedia", "The same media item cannot be attached twice.");
 
     public static Error ContentTooLong =>
         Error.Validation("Post.ContentTooLong", $"Post content must not exceed {MaxContentLength} characters.");

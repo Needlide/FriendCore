@@ -1,8 +1,12 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Options;
+using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Posts.Queries.GetHomeFeed;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace FriendCore.UnitTests.Posts;
@@ -23,7 +27,10 @@ public class GetHomeFeedQueryHandlerTests
 
     private GetHomeFeedQueryHandler CreateHandler()
     {
-        return new GetHomeFeedQueryHandler(_currentUserService, _postRepository, _userRepository);
+        var mediaFactory = new PostMediaResponseFactory(
+            Substitute.For<IMediaRepository>(),
+            Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
+        return new GetHomeFeedQueryHandler(_currentUserService, _postRepository, _userRepository, mediaFactory);
     }
 
     [Fact]

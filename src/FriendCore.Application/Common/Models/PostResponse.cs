@@ -13,9 +13,14 @@ public sealed record PostResponse(
     int LikeCount,
     int CommentCount,
     bool IsLikedByCurrentUser,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<PostMediaResponse> Media)
 {
-    public static PostResponse Create(Post post, User author, bool isLikedByCurrentUser) =>
+    public static PostResponse Create(
+        Post post,
+        User author,
+        bool isLikedByCurrentUser,
+        IReadOnlyList<PostMediaResponse> media) =>
         new(
             post.Id.ToString(),
             post.AuthorId.ToString(),
@@ -26,7 +31,8 @@ public sealed record PostResponse(
             post.LikeCount,
             post.CommentCount,
             isLikedByCurrentUser,
-            post.CreatedAt);
+            post.CreatedAt,
+            media);
 }
 
 public sealed record PostFeedResponse(IReadOnlyList<PostResponse> Posts, string? NextCursor);

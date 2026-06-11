@@ -41,5 +41,11 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         // index-ordered even across rows that share a created_at.
         builder.HasIndex(post => new { post.AuthorId, post.CreatedAt, post.Id }).HasFilter("deleted_at IS NULL");
         builder.HasIndex(post => new { post.CreatedAt, post.Id }).HasFilter("deleted_at IS NULL");
+
+        builder.HasMany(post => post.Media)
+            .WithOne()
+            .HasForeignKey(postMedia => postMedia.PostId);
+
+        builder.Navigation(post => post.Media).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

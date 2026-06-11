@@ -1,9 +1,13 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Options;
 using FriendCore.Application.Posts.Commands.CreatePost;
 using FriendCore.Application.Posts.Commands.DeletePost;
+using FriendCore.Application.Posts.Common;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace FriendCore.UnitTests.Posts;
@@ -15,6 +19,7 @@ public class PostCommandHandlerTests
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
+    private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly User _author = UserTestFactory.Create();
 
@@ -23,10 +28,36 @@ public class PostCommandHandlerTests
         _currentUserService.UserId.Returns(_author.Id);
         _dateTimeProvider.UtcNow.Returns(Now);
         _userRepository.GetByIdAsync(_author.Id, Arg.Any<CancellationToken>()).Returns(_author);
+        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+            .Returns([]);
     }
 
-    private CreatePostCommandHandler CreateHandler() =>
-        new(_currentUserService, _userRepository, _postRepository, _dateTimeProvider);
+    private CreatePostCommandHandler CreateHandler()
+    {
+        var mediaFactory = new PostMediaResponseFactory(
+            _mediaRepository,
+            Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
+        return new(
+            _currentUserService, _userRepository, _postRepository, _mediaRepository, mediaFactory,
+            _dateTimeProvider);
+    }
+
+    private MediaItem ReadyMedia(Ulid? uploaderId = null)
+    {
+        var media = MediaItem.Create(
+            uploaderId ?? _author.Id, "x.png", "image/png", "png", false, false, Now);
+        media.MarkReady([
+            MediaVariant.Create(
+                MediaVariantType.Medium, MediaStorageKeys.Variant(media.Id, MediaVariantType.Medium), 800, 600, 1000)
+        ]);
+        return media;
+    }
+
+    private void MediaLookupReturns(params MediaItem[] items)
+    {
+        _mediaRepository.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+            .Returns(items);
+    }
 
     private DeletePostCommandHandler DeleteHandler() =>
         new(_currentUserService, _postRepository);
@@ -37,7 +68,7 @@ public class PostCommandHandlerTests
         _currentUserService.UserId.Returns((Ulid?)null);
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("hello", ContentSensitivity.General),
+            new CreatePostCommand("hello", PostSensitivity.General, []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -51,7 +82,7 @@ public class PostCommandHandlerTests
         await _postRepository.AddAsync(Arg.Do<Post>(p => added = p), Arg.Any<CancellationToken>());
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("hello world", ContentSensitivity.Sensitive),
+            new CreatePostCommand("hello world", PostSensitivity.Sensitive, []),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -61,6 +92,89 @@ public class PostCommandHandlerTests
         Assert.Equal(_author.Username, result.Value.AuthorUsername);
         Assert.Equal(nameof(ContentSensitivity.Sensitive), result.Value.Sensitivity);
         Assert.False(result.Value.IsLikedByCurrentUser);
+        Assert.Empty(result.Value.Media);
+    }
+
+    [Fact]
+    public async Task Create_WithReadyOwnedMedia_AttachesInOrder_AndReturnsVariantUrls()
+    {
+        var first = ReadyMedia();
+        var second = ReadyMedia();
+        MediaLookupReturns(first, second);
+        Post? added = null;
+        await _postRepository.AddAsync(Arg.Do<Post>(p => added = p), Arg.Any<CancellationToken>());
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand(null, PostSensitivity.General,
+                [first.Id.ToString(), second.Id.ToString()]),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Null(added!.Content); // image-only post
+        Assert.Equal([first.Id, second.Id], added.Media.OrderBy(m => m.DisplayOrder).Select(m => m.MediaItemId));
+        Assert.Equal(2, result.Value.Media.Count);
+        Assert.Equal(first.Id.ToString(), result.Value.Media[0].Id);
+        Assert.Equal(
+            $"http://storage.test/media/uploads/variants/{first.Id}/medium.webp",
+            result.Value.Media[0].Variants.Single().Url);
+    }
+
+    [Fact]
+    public async Task Create_WithProcessingMedia_ReturnsNotReady()
+    {
+        var processing = MediaItem.Create(_author.Id, "x.png", "image/png", "png", false, false, Now);
+        MediaLookupReturns(processing);
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("text", PostSensitivity.General, [processing.Id.ToString()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Media.NotReady", result.FirstError.Code);
+        await _postRepository.DidNotReceive().AddAsync(Arg.Any<Post>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Create_WithSomeoneElsesMedia_ReturnsNotOwner()
+    {
+        var foreign = ReadyMedia(Ulid.NewUlid());
+        MediaLookupReturns(foreign);
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("text", PostSensitivity.General, [foreign.Id.ToString()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Media.NotOwner", result.FirstError.Code);
+    }
+
+    [Fact]
+    public async Task Create_WithUnknownMedia_ReturnsNotFound()
+    {
+        MediaLookupReturns(); // lookup yields nothing
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("text", PostSensitivity.General, [Ulid.NewUlid().ToString()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Media.NotFound", result.FirstError.Code);
+    }
+
+    [Fact]
+    public async Task Create_WithAlreadyAttachedMedia_ReturnsConflict()
+    {
+        var media = ReadyMedia();
+        MediaLookupReturns(media);
+        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+            .Returns([media.Id]);
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("text", PostSensitivity.General, [media.Id.ToString()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Media.AlreadyAttached", result.FirstError.Code);
     }
 
     [Fact]

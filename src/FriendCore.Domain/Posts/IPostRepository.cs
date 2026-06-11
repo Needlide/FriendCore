@@ -36,6 +36,12 @@ public interface IPostRepository
         IReadOnlyCollection<Ulid> postIds,
         CancellationToken cancellationToken = default);
 
+    // Which of the given media ids are already attached to any post (including soft-deleted ones —
+    // the unique index spans them). Used by CreatePost to reject reuse with a clean error.
+    Task<IReadOnlyList<Ulid>> GetAttachedMediaIdsAsync(
+        IReadOnlyCollection<Ulid> mediaIds,
+        CancellationToken cancellationToken = default);
+
     Task AddCommentAsync(Comment comment, CancellationToken cancellationToken = default);
 
     Task<Comment?> GetCommentByIdAsync(Ulid id, CancellationToken cancellationToken = default);

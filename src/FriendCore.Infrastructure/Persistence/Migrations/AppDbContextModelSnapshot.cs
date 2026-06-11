@@ -22,6 +22,75 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FriendCore.Domain.Media.MediaItem", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("HasFlashingWarning")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_flashing_warning");
+
+                    b.Property<bool>("HasIntenseMotionWarning")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_intense_motion_warning");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("original_file_name");
+
+                    b.Property<string>("OriginalStorageKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("original_storage_key");
+
+                    b.Property<DateTimeOffset?>("SafetyFlaggedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("safety_flagged_at");
+
+                    b.Property<string>("SafetySource")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("safety_source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UploaderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploader_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UploaderId")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("media_items", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Posts.Comment", b =>
                 {
                     b.Property<string>("Id")
@@ -138,6 +207,28 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("posts", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Posts.PostMedia", b =>
+                {
+                    b.Property<string>("PostId")
+                        .HasColumnType("text")
+                        .HasColumnName("post_id");
+
+                    b.Property<string>("MediaItemId")
+                        .HasColumnType("text")
+                        .HasColumnName("media_item_id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.HasKey("PostId", "MediaItemId");
+
+                    b.HasIndex("MediaItemId")
+                        .IsUnique();
+
+                    b.ToTable("post_media", (string)null);
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Tags.Tag", b =>
@@ -400,6 +491,57 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("user_preferences", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Media.MediaItem", b =>
+                {
+                    b.OwnsMany("FriendCore.Domain.Media.MediaVariant", "Variants", b1 =>
+                        {
+                            b1.Property<string>("media_item_id")
+                                .HasColumnType("text")
+                                .HasColumnName("media_item_id");
+
+                            b1.Property<string>("Type")
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("type");
+
+                            b1.Property<long>("FileSizeBytes")
+                                .HasColumnType("bigint")
+                                .HasColumnName("file_size_bytes");
+
+                            b1.Property<int>("HeightPx")
+                                .HasColumnType("integer")
+                                .HasColumnName("height_px");
+
+                            b1.Property<string>("StorageKey")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("storage_key");
+
+                            b1.Property<int>("WidthPx")
+                                .HasColumnType("integer")
+                                .HasColumnName("width_px");
+
+                            b1.HasKey("media_item_id", "Type");
+
+                            b1.ToTable("media_variants", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("media_item_id");
+                        });
+
+                    b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Posts.PostMedia", b =>
+                {
+                    b.HasOne("FriendCore.Domain.Posts.Post", null)
+                        .WithMany("Media")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.User", b =>
                 {
                     b.OwnsMany("FriendCore.Domain.Tags.ProfileTag", "ProfileTags", b1 =>
@@ -472,6 +614,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("ProfileTags");
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Posts.Post", b =>
+                {
+                    b.Navigation("Media");
                 });
 #pragma warning restore 612, 618
         }

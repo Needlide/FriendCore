@@ -11,7 +11,8 @@ namespace FriendCore.Application.Posts.Queries.GetUserPosts;
 internal sealed class GetUserPostsQueryHandler(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
-    IPostRepository postRepository)
+    IPostRepository postRepository,
+    PostMediaResponseFactory mediaResponseFactory)
     : IRequestHandler<GetUserPostsQuery, ErrorOr<PostFeedResponse>>
 {
     private const int PageSize = 20;
@@ -31,9 +32,11 @@ internal sealed class GetUserPostsQueryHandler(
         var page = hasMore ? posts.Take(PageSize).ToList() : posts;
 
         var likedPostIds = await GetLikedPostIdsAsync(page, cancellationToken);
+        var mediaByPost = await mediaResponseFactory.ForPostsAsync(page, cancellationToken);
 
         var items = page
-            .Select(post => PostResponse.Create(post, user, likedPostIds.Contains(post.Id)))
+            .Select(post => PostResponse.Create(
+                post, user, likedPostIds.Contains(post.Id), mediaByPost.GetValueOrDefault(post.Id, [])))
             .ToList();
         var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 

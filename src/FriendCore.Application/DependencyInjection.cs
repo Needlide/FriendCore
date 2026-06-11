@@ -1,5 +1,6 @@
 using FluentValidation;
 using FriendCore.Application.Common.Behaviors;
+using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Tags.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
 
         services.AddSingleton<ITagNormalizer, TagNormalizationService>();
+        services.AddScoped<PostMediaResponseFactory>();
 
         return services;
     }

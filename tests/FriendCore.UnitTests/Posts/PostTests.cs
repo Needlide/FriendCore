@@ -25,12 +25,58 @@ public class PostTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
-    public void Create_RequiresContent(string? content)
+    public void Create_RequiresContentOrMedia(string? content)
     {
         var result = Post.Create(Ulid.NewUlid(), content, ContentSensitivity.General, Now);
 
         Assert.True(result.IsError);
-        Assert.Equal("Post.ContentRequired", result.FirstError.Code);
+        Assert.Equal("Post.ContentOrMediaRequired", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Create_AllowsImageOnlyPost_WithNullContent()
+    {
+        var mediaIds = new[] { Ulid.NewUlid(), Ulid.NewUlid() };
+
+        var result = Post.Create(Ulid.NewUlid(), "   ", ContentSensitivity.General, Now, mediaIds);
+
+        Assert.False(result.IsError);
+        Assert.Null(result.Value.Content);
+        Assert.Equal(2, result.Value.Media.Count);
+    }
+
+    [Fact]
+    public void Create_AssignsDisplayOrder_FromMediaIdOrder()
+    {
+        var mediaIds = new[] { Ulid.NewUlid(), Ulid.NewUlid(), Ulid.NewUlid() };
+
+        var post = Post.Create(Ulid.NewUlid(), "with media", ContentSensitivity.General, Now, mediaIds).Value;
+
+        Assert.Equal(mediaIds, post.Media.OrderBy(m => m.DisplayOrder).Select(m => m.MediaItemId));
+        Assert.Equal([0, 1, 2], post.Media.Select(m => m.DisplayOrder).Order());
+        Assert.All(post.Media, m => Assert.Equal(post.Id, m.PostId));
+    }
+
+    [Fact]
+    public void Create_RejectsMoreThanMaxMedia()
+    {
+        var mediaIds = Enumerable.Range(0, PostErrors.MaxMediaPerPost + 1).Select(_ => Ulid.NewUlid()).ToList();
+
+        var result = Post.Create(Ulid.NewUlid(), null, ContentSensitivity.General, Now, mediaIds);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Post.TooManyMedia", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Create_RejectsDuplicateMedia()
+    {
+        var mediaId = Ulid.NewUlid();
+
+        var result = Post.Create(Ulid.NewUlid(), null, ContentSensitivity.General, Now, [mediaId, mediaId]);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Post.DuplicateMedia", result.FirstError.Code);
     }
 
     [Fact]

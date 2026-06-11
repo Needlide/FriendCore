@@ -29,7 +29,9 @@ public sealed class PostsController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Create([FromBody] CreatePostRequest request, CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new CreatePostCommand(request.Content, request.Sensitivity), cancellationToken);
+        var result = await sender.Send(
+            new CreatePostCommand(request.Content, request.Sensitivity, request.MediaIds ?? []),
+            cancellationToken);
         return result.ToCreatedResult();
     }
 
