@@ -115,7 +115,7 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
 
         // Concatenating the pages must reproduce every post exactly once, in descending order —
         // this single check catches overlaps (duplicates), gaps (missing), and ordering errors.
-        var seen = page1.Posts.Concat(page2.Posts).Select(p => p.Content).ToList();
+        var seen = page1.Posts.Concat(page2.Posts).Select(p => p.Content).OfType<string>().ToList();
         var expected = Enumerable.Range(0, total).Reverse().Select(i => $"post-{i:D2}").ToList();
         Assert.Equal(expected, seen);
         Assert.Equal(total, seen.Distinct().Count());
