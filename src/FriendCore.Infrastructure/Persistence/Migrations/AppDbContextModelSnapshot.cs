@@ -384,6 +384,25 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("follows", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Users.Mute", b =>
+                {
+                    b.Property<string>("MuterId")
+                        .HasColumnType("text")
+                        .HasColumnName("muter_id");
+
+                    b.Property<string>("MutedId")
+                        .HasColumnType("text")
+                        .HasColumnName("muted_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("MuterId", "MutedId");
+
+                    b.ToTable("mutes", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.User", b =>
                 {
                     b.Property<string>("Id")

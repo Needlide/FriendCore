@@ -4,8 +4,10 @@ using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
 using FriendCore.Application.Users.Commands.BlockUser;
 using FriendCore.Application.Users.Commands.FollowUser;
+using FriendCore.Application.Users.Commands.MuteUser;
 using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
+using FriendCore.Application.Users.Commands.UnmuteUser;
 using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetFollowers;
 using FriendCore.Application.Users.Queries.GetFollowing;
@@ -116,6 +118,29 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<IActionResult> Unblock(string username, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new UnblockUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPost("{username}/mute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Mute(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new MuteUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpDelete("{username}/mute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unmute(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UnmuteUserCommand(username), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 

@@ -59,7 +59,10 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
         CancellationToken cancellationToken = default)
     {
         var query = context.Posts.Where(post =>
-            context.Follows.Any(follow => follow.FollowerId == userId && follow.FollowedId == post.AuthorId));
+            context.Follows.Any(follow => follow.FollowerId == userId && follow.FollowedId == post.AuthorId)
+            // One-way mute (§13.6): excluded from the feed only — deliberately not a global
+            // filter, so direct profile and post access stay visible.
+            && !context.Mutes.Any(mute => mute.MuterId == userId && mute.MutedId == post.AuthorId));
 
         if (cursor is { } before)
             query = query.Where(post =>

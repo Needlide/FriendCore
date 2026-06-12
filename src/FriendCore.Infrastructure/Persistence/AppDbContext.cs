@@ -28,6 +28,7 @@ public class AppDbContext(
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<Block> Blocks => Set<Block>();
+    public DbSet<Mute> Mutes => Set<Mute>();
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<Comment> Comments => Set<Comment>();

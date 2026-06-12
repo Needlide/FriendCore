@@ -35,6 +35,9 @@ public static class UserErrors
     public static Error CannotBlockSelf =>
         Error.Validation("User.CannotBlockSelf", "You cannot block yourself.");
 
+    public static Error CannotMuteSelf =>
+        Error.Validation("User.CannotMuteSelf", "You cannot mute yourself.");
+
     public static Error BlockRequiresConfirmation =>
         Error.Conflict("User.BlockRequiresConfirmation",
             "A follow relationship exists with this user. Blocking will remove it; re-send with confirmed=true to proceed.");
