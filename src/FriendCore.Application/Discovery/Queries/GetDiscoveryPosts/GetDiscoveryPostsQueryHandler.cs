@@ -17,7 +17,7 @@ internal sealed class GetDiscoveryPostsQueryHandler(
     IUserRepository userRepository,
     IFollowRepository followRepository,
     IMuteRepository muteRepository,
-    PostMediaResponseFactory mediaResponseFactory,
+    PostResponseAssembler responseAssembler,
     ICacheService cacheService)
     : IRequestHandler<GetDiscoveryPostsQuery, ErrorOr<DiscoveryPostsResponse>>
 {
@@ -73,25 +73,7 @@ internal sealed class GetDiscoveryPostsQueryHandler(
             .Select(id => visible[id])
             .ToList();
 
-        var authors = (await userRepository.GetByIdsAsync(
-                ordered.Select(post => post.AuthorId).Distinct().ToList(), cancellationToken))
-            .ToDictionary(user => user.Id);
-
-        var likedPostIds = (await postRepository.GetLikedPostIdsAsync(
-                userId, ordered.Select(post => post.Id).ToList(), cancellationToken))
-            .ToHashSet();
-
-        var mediaByPost = await mediaResponseFactory.ForPostsAsync(ordered, cancellationToken);
-
-        var items = ordered
-            .Where(post => authors.ContainsKey(post.AuthorId))
-            .Select(post => PostResponse.Create(
-                post,
-                authors[post.AuthorId],
-                likedPostIds.Contains(post.Id),
-                mediaByPost.GetValueOrDefault(post.Id, [])))
-            .ToList();
-
+        var items = await responseAssembler.AssembleAsync(ordered, userId, cancellationToken);
         return new DiscoveryPostsResponse(items);
     }
 }

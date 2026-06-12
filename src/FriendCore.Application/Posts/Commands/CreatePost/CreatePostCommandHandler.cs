@@ -73,7 +73,8 @@ internal sealed class CreatePostCommandHandler(
 
         var mediaByPost = await mediaResponseFactory.ForPostsAsync([post], cancellationToken);
         return PostResponse.Create(
-            post, author, isLikedByCurrentUser: false, mediaByPost.GetValueOrDefault(post.Id, []));
+            post, author, isLikedByCurrentUser: false, mediaByPost.GetValueOrDefault(post.Id, []),
+            tags.Select(PostTagResponse.Create).ToList());
     }
 
     // Same resolution flow as UpdateProfileTags (normalise → resolve aliases → create missing →

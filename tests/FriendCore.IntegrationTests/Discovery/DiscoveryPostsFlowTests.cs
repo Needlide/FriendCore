@@ -54,6 +54,9 @@ public class DiscoveryPostsFlowTests(FriendCoreApiFactory factory) : IClassFixtu
         var posts = (await GetPosts(viewer)).Posts;
 
         Assert.Equal([newer, older], posts.Select(p => p.Id).ToArray());
+
+        // Post responses carry their tags (name + slug) so clients can display them.
+        Assert.Contains(posts[0].Tags, t => t.Slug == tag);
     }
 
     [Fact]

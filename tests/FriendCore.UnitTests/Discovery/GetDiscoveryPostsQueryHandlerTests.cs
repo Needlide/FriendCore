@@ -40,9 +40,12 @@ public class GetDiscoveryPostsQueryHandlerTests
         var mediaFactory = new PostMediaResponseFactory(
             Substitute.For<IMediaRepository>(),
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
+        var assembler = new PostResponseAssembler(
+            _userRepository, _postRepository, Substitute.For<FriendCore.Domain.Tags.ITagRepository>(),
+            mediaFactory);
         return new GetDiscoveryPostsQueryHandler(
             _currentUserService, _discoveryRepository, _postRepository, _userRepository,
-            _followRepository, _muteRepository, mediaFactory, _cacheService);
+            _followRepository, _muteRepository, assembler, _cacheService);
     }
 
     private void CacheReturns(params Ulid[] postIds)

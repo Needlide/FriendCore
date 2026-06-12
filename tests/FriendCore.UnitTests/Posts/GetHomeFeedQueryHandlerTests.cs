@@ -32,7 +32,10 @@ public class GetHomeFeedQueryHandlerTests
         var mediaFactory = new PostMediaResponseFactory(
             Substitute.For<IMediaRepository>(),
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
-        return new GetHomeFeedQueryHandler(_currentUserService, _postRepository, _userRepository, mediaFactory);
+        var assembler = new PostResponseAssembler(
+            _userRepository, _postRepository, Substitute.For<FriendCore.Domain.Tags.ITagRepository>(),
+            mediaFactory);
+        return new GetHomeFeedQueryHandler(_currentUserService, _postRepository, _userRepository, assembler);
     }
 
     [Fact]

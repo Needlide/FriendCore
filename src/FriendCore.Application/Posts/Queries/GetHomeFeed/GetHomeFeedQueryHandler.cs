@@ -13,7 +13,7 @@ internal sealed class GetHomeFeedQueryHandler(
     ICurrentUserService currentUserService,
     IPostRepository postRepository,
     IUserRepository userRepository,
-    PostMediaResponseFactory mediaResponseFactory)
+    PostResponseAssembler responseAssembler)
     : IRequestHandler<GetHomeFeedQuery, ErrorOr<PostFeedResponse>>
 {
     private const int PageSize = 20;
@@ -36,26 +36,7 @@ internal sealed class GetHomeFeedQueryHandler(
         var hasMore = posts.Count > PageSize;
         var page = hasMore ? posts.Take(PageSize).ToList() : posts;
 
-        var authorIds = page.Select(post => post.AuthorId).Distinct().ToList();
-        var authors = (await userRepository.GetByIdsAsync(authorIds, cancellationToken))
-            .ToDictionary(user => user.Id);
-
-        var likedPostIds = page.Count == 0
-            ? []
-            : (await postRepository.GetLikedPostIdsAsync(userId, page.Select(post => post.Id).ToList(),
-                cancellationToken))
-            .ToHashSet();
-
-        var mediaByPost = await mediaResponseFactory.ForPostsAsync(page, cancellationToken);
-
-        var items = page
-            .Where(post => authors.ContainsKey(post.AuthorId))
-            .Select(post => PostResponse.Create(
-                post,
-                authors[post.AuthorId],
-                likedPostIds.Contains(post.Id),
-                mediaByPost.GetValueOrDefault(post.Id, [])))
-            .ToList();
+        var items = await responseAssembler.AssembleAsync(page, userId, cancellationToken);
 
         var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
         return new PostFeedResponse(items, nextCursor);

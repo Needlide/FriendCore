@@ -12,7 +12,7 @@ internal sealed class GetUserPostsQueryHandler(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
     IPostRepository postRepository,
-    PostMediaResponseFactory mediaResponseFactory)
+    PostResponseAssembler responseAssembler)
     : IRequestHandler<GetUserPostsQuery, ErrorOr<PostFeedResponse>>
 {
     private const int PageSize = 20;
@@ -31,27 +31,9 @@ internal sealed class GetUserPostsQueryHandler(
         var hasMore = posts.Count > PageSize;
         var page = hasMore ? posts.Take(PageSize).ToList() : posts;
 
-        var likedPostIds = await GetLikedPostIdsAsync(page, cancellationToken);
-        var mediaByPost = await mediaResponseFactory.ForPostsAsync(page, cancellationToken);
-
-        var items = page
-            .Select(post => PostResponse.Create(
-                post, user, likedPostIds.Contains(post.Id), mediaByPost.GetValueOrDefault(post.Id, [])))
-            .ToList();
+        var items = await responseAssembler.AssembleAsync(page, currentUserService.UserId, cancellationToken);
         var nextCursor = hasMore ? PostCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 
         return new PostFeedResponse(items, nextCursor);
-    }
-
-    private async Task<HashSet<Ulid>> GetLikedPostIdsAsync(
-        IReadOnlyList<Post> posts,
-        CancellationToken cancellationToken)
-    {
-        if (currentUserService.UserId is not { } userId || posts.Count == 0)
-            return [];
-
-        var ids = posts.Select(post => post.Id).ToList();
-        var liked = await postRepository.GetLikedPostIdsAsync(userId, ids, cancellationToken);
-        return liked.ToHashSet();
     }
 }

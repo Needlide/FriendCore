@@ -22,6 +22,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ITagNormalizer, TagNormalizationService>();
         services.AddScoped<PostMediaResponseFactory>();
+        services.AddScoped<PostResponseAssembler>();
 
         return services;
     }
