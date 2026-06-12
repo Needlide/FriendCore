@@ -1,4 +1,5 @@
 using System.Reflection;
+using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
@@ -8,8 +9,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FriendCore.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    ICurrentUserService? currentUserService = null) : DbContext(options)
 {
+    /// <summary>
+    ///     Named query filters (EF 10). Both apply to every query by default; a specific one can
+    ///     be skipped with <c>IgnoreQueryFilters([AppDbContext.BlocksFilter])</c> while the other
+    ///     keeps protecting the query.
+    /// </summary>
+    public const string SoftDeleteFilter = "SoftDelete";
+
+    public const string BlocksFilter = "Blocks";
+
     public DbSet<User> Users => Set<User>();
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
@@ -22,10 +34,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MediaItem> MediaItems => Set<MediaItem>();
     public DbSet<PostMedia> PostMedia => Set<PostMedia>();
 
+    // Referenced inside the block filters. The model (and the filter expressions in it) is built
+    // ONCE and cached for the lifetime of the app; EF rewrites accesses to this property so each
+    // query reads it from the context instance that is executing, as a query parameter. That is
+    // what turns one static filter definition into a per-request predicate. Null outside an HTTP
+    // request (background services, design time) — the filters then pass everything through.
+    private Ulid? CurrentUserId => currentUserService?.UserId;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         ApplySoftDeleteQueryFilters(modelBuilder);
+        ApplyBlockQueryFilters(modelBuilder);
     }
 
     /// <summary>
@@ -50,6 +70,33 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     private static void CreateSoftDeleteFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, ISoftDeletable
     {
-        modelBuilder.Entity<TEntity>().HasQueryFilter(entity => entity.DeletedAt == null);
+        modelBuilder.Entity<TEntity>().HasQueryFilter(SoftDeleteFilter, entity => entity.DeletedAt == null);
+    }
+
+    /// <summary>
+    ///     §8.2: content from users with a block relationship (either direction) with the current
+    ///     user is excluded from every query automatically — no handler has to remember blocks.
+    ///     Per spec the filter covers User, Post, and Comment; Likes are deliberately not
+    ///     filtered (counts may include blocked users — accepted MVP trade-off).
+    /// </summary>
+    private void ApplyBlockQueryFilters(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<User>().HasQueryFilter(BlocksFilter, user =>
+            CurrentUserId == null
+            || !Blocks.Any(b =>
+                (b.BlockerId == CurrentUserId && b.BlockedId == user.Id)
+                || (b.BlockerId == user.Id && b.BlockedId == CurrentUserId)));
+
+        modelBuilder.Entity<Post>().HasQueryFilter(BlocksFilter, post =>
+            CurrentUserId == null
+            || !Blocks.Any(b =>
+                (b.BlockerId == CurrentUserId && b.BlockedId == post.AuthorId)
+                || (b.BlockerId == post.AuthorId && b.BlockedId == CurrentUserId)));
+
+        modelBuilder.Entity<Comment>().HasQueryFilter(BlocksFilter, comment =>
+            CurrentUserId == null
+            || !Blocks.Any(b =>
+                (b.BlockerId == CurrentUserId && b.BlockedId == comment.AuthorId)
+                || (b.BlockerId == comment.AuthorId && b.BlockedId == CurrentUserId)));
     }
 }

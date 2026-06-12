@@ -17,8 +17,10 @@ internal sealed class UnblockUserCommandHandler(
         if (currentUserService.UserId is not { } userId)
             return CommonErrors.Unauthorized;
 
+        // Must resolve across the block filter — the filtered lookup can never see the very user
+        // being unblocked, which would make unblocking impossible.
         var slug = User.ToUsernameSlug(request.Username);
-        var target = await userRepository.GetByUsernameSlugAsync(slug, cancellationToken);
+        var target = await userRepository.GetByUsernameSlugIgnoringBlocksAsync(slug, cancellationToken);
         if (target is null)
             return UserErrors.NotFound;
 

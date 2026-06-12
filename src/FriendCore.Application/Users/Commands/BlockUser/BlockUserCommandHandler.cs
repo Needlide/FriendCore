@@ -19,8 +19,11 @@ internal sealed class BlockUserCommandHandler(
         if (currentUserService.UserId is not { } userId)
             return CommonErrors.Unauthorized;
 
+        // Resolve across the block filter: keeps re-blocking idempotent, and lets a user place
+        // their own block row even when the target blocked them first (protection that survives
+        // the other side unblocking). Responses are identical either way, so nothing leaks.
         var slug = User.ToUsernameSlug(request.Username);
-        var target = await userRepository.GetByUsernameSlugAsync(slug, cancellationToken);
+        var target = await userRepository.GetByUsernameSlugIgnoringBlocksAsync(slug, cancellationToken);
         if (target is null || target.IsBanned)
             return UserErrors.NotFound;
 

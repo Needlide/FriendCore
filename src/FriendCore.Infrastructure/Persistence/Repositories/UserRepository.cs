@@ -32,6 +32,16 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         return context.Users.FirstOrDefaultAsync(user => user.UsernameSlug == usernameSlug, cancellationToken);
     }
 
+    public Task<User?> GetByUsernameSlugIgnoringBlocksAsync(
+        string usernameSlug,
+        CancellationToken cancellationToken = default)
+    {
+        // Skips only the block filter — soft-delete still applies.
+        return context.Users
+            .IgnoreQueryFilters([AppDbContext.BlocksFilter])
+            .FirstOrDefaultAsync(user => user.UsernameSlug == usernameSlug, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetByIdsAsync(
         IReadOnlyCollection<Ulid> ids,
         CancellationToken cancellationToken = default)

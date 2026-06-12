@@ -21,7 +21,7 @@ public class BlockUserCommandHandlerTests
     {
         _currentUserService.UserId.Returns(_currentUserId);
         _dateTimeProvider.UtcNow.Returns(Now);
-        _userRepository.GetByUsernameSlugAsync("bob", Arg.Any<CancellationToken>()).Returns(_target);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync("bob", Arg.Any<CancellationToken>()).Returns(_target);
     }
 
     private BlockUserCommandHandler CreateHandler() =>
@@ -41,7 +41,8 @@ public class BlockUserCommandHandlerTests
     [Fact]
     public async Task Handle_ReturnsNotFound_WhenTargetMissing()
     {
-        _userRepository.GetByUsernameSlugAsync("ghost", Arg.Any<CancellationToken>()).Returns((User?)null);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync("ghost", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
 
         var result = await CreateHandler().Handle(new BlockUserCommand("ghost", false), CancellationToken.None);
 
@@ -117,7 +118,8 @@ public class BlockUserCommandHandlerTests
     public async Task Handle_ReturnsNotFound_WhenTargetBanned()
     {
         var banned = UserTestFactory.CreateBanned();
-        _userRepository.GetByUsernameSlugAsync(banned.UsernameSlug, Arg.Any<CancellationToken>()).Returns(banned);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync(banned.UsernameSlug, Arg.Any<CancellationToken>())
+            .Returns(banned);
 
         var result = await CreateHandler().Handle(
             new BlockUserCommand(banned.Username, false), CancellationToken.None);

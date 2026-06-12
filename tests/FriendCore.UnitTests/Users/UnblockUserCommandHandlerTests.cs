@@ -16,7 +16,7 @@ public class UnblockUserCommandHandlerTests
     public UnblockUserCommandHandlerTests()
     {
         _currentUserService.UserId.Returns(_currentUserId);
-        _userRepository.GetByUsernameSlugAsync("bob", Arg.Any<CancellationToken>()).Returns(_target);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync("bob", Arg.Any<CancellationToken>()).Returns(_target);
     }
 
     private UnblockUserCommandHandler CreateHandler() =>
@@ -36,7 +36,8 @@ public class UnblockUserCommandHandlerTests
     [Fact]
     public async Task Handle_ReturnsNotFound_WhenTargetMissing()
     {
-        _userRepository.GetByUsernameSlugAsync("ghost", Arg.Any<CancellationToken>()).Returns((User?)null);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync("ghost", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
 
         var result = await CreateHandler().Handle(new UnblockUserCommand("ghost"), CancellationToken.None);
 
