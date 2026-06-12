@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IFollowRepository, FollowRepository>();
+        services.AddScoped<IBlockRepository, BlockRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddHostedService<TagMaintenanceService>();

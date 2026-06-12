@@ -32,6 +32,13 @@ public static class UserErrors
     public static Error CannotFollowSelf =>
         Error.Validation("User.CannotFollowSelf", "You cannot follow yourself.");
 
+    public static Error CannotBlockSelf =>
+        Error.Validation("User.CannotBlockSelf", "You cannot block yourself.");
+
+    public static Error BlockRequiresConfirmation =>
+        Error.Conflict("User.BlockRequiresConfirmation",
+            "A follow relationship exists with this user. Blocking will remove it; re-send with confirmed=true to proceed.");
+
     public static Error EmailAlreadyVerified =>
         Error.Conflict("User.EmailAlreadyVerified", "Email is already verified.");
 

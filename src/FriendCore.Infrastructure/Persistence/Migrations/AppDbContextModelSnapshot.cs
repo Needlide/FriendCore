@@ -300,6 +300,27 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("tags", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Users.Block", b =>
+                {
+                    b.Property<string>("BlockerId")
+                        .HasColumnType("text")
+                        .HasColumnName("blocker_id");
+
+                    b.Property<string>("BlockedId")
+                        .HasColumnType("text")
+                        .HasColumnName("blocked_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("BlockerId", "BlockedId");
+
+                    b.HasIndex("BlockedId", "BlockerId");
+
+                    b.ToTable("blocks", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.EmailVerificationToken", b =>
                 {
                     b.Property<string>("Id")

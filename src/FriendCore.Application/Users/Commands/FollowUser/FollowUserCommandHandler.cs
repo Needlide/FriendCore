@@ -10,6 +10,7 @@ internal sealed class FollowUserCommandHandler(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
     IFollowRepository followRepository,
+    IBlockRepository blockRepository,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<FollowUserCommand, ErrorOr<Success>>
 {
@@ -25,6 +26,11 @@ internal sealed class FollowUserCommandHandler(
 
         if (target.Id == userId)
             return UserErrors.CannotFollowSelf;
+
+        // §8.2: a block in either direction makes the target invisible — 404, never 403,
+        // so a blocked user cannot learn they were blocked.
+        if (await blockRepository.ExistsBetweenAsync(userId, target.Id, cancellationToken))
+            return UserErrors.NotFound;
 
         // Idempotent: re-following is a no-op.
         if (!await followRepository.ExistsAsync(userId, target.Id, cancellationToken))

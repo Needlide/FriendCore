@@ -12,6 +12,7 @@ public class FollowUserCommandHandlerTests
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IFollowRepository _followRepository = Substitute.For<IFollowRepository>();
+    private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _currentUserId = Ulid.NewUlid();
     private readonly User _target = UserTestFactory.Create(username: "bob");
@@ -24,7 +25,7 @@ public class FollowUserCommandHandlerTests
     }
 
     private FollowUserCommandHandler CreateHandler() =>
-        new(_currentUserService, _userRepository, _followRepository, _dateTimeProvider);
+        new(_currentUserService, _userRepository, _followRepository, _blockRepository, _dateTimeProvider);
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -70,6 +71,20 @@ public class FollowUserCommandHandlerTests
         await _followRepository.Received(1).AddAsync(
             Arg.Is<Follow>(f => f.FollowerId == _currentUserId && f.FollowedId == _target.Id),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsNotFound_WhenBlockExistsEitherDirection()
+    {
+        // 404, not 403 — a blocked user must not learn they were blocked (§8.2).
+        _blockRepository.ExistsBetweenAsync(_currentUserId, _target.Id, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await CreateHandler().Handle(new FollowUserCommand("bob"), CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("User.NotFound", result.FirstError.Code);
+        await _followRepository.DidNotReceive().AddAsync(Arg.Any<Follow>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

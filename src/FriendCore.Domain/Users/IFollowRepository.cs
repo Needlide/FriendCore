@@ -4,6 +4,9 @@ public interface IFollowRepository
 {
     Task<bool> ExistsAsync(Ulid followerId, Ulid followedId, CancellationToken cancellationToken = default);
 
+    // A follow in either direction between the two users.
+    Task<bool> ExistsBetweenAsync(Ulid userA, Ulid userB, CancellationToken cancellationToken = default);
+
     Task AddAsync(Follow follow, CancellationToken cancellationToken = default);
 
     Task<bool> RemoveAsync(Ulid followerId, Ulid followedId, CancellationToken cancellationToken = default);

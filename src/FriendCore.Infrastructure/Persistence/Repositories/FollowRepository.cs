@@ -12,6 +12,14 @@ public sealed class FollowRepository(AppDbContext context) : IFollowRepository
             cancellationToken);
     }
 
+    public Task<bool> ExistsBetweenAsync(Ulid userA, Ulid userB, CancellationToken cancellationToken = default)
+    {
+        return context.Follows.AnyAsync(
+            follow => (follow.FollowerId == userA && follow.FollowedId == userB)
+                      || (follow.FollowerId == userB && follow.FollowedId == userA),
+            cancellationToken);
+    }
+
     public async Task AddAsync(Follow follow, CancellationToken cancellationToken = default)
     {
         await context.Follows.AddAsync(follow, cancellationToken);

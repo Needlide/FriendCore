@@ -2,7 +2,9 @@ using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Contracts.Users;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
+using FriendCore.Application.Users.Commands.BlockUser;
 using FriendCore.Application.Users.Commands.FollowUser;
+using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetFollowers;
@@ -11,6 +13,7 @@ using FriendCore.Application.Users.Queries.GetUserProfile;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace FriendCore.API.Controllers;
 
@@ -83,6 +86,36 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<IActionResult> Unfollow(string username, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new UnfollowUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPost("{username}/block")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Block(
+        string username,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BlockUserRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new BlockUserCommand(username, request?.Confirmed ?? false),
+            cancellationToken);
+
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpDelete("{username}/block")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unblock(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UnblockUserCommand(username), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
