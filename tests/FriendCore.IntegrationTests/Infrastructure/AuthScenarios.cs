@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Tags;
@@ -43,6 +44,35 @@ public class AuthScenarios(FriendCoreApiFactory factory)
         var registered = await Register(client, email);
         var body = await registered.Content.ReadFromJsonAsync<AuthResponse>();
         return body!.AccessToken;
+    }
+
+    /// <summary>
+    ///     Registers a fresh user, marks the email verified directly in the DB (the end-to-end
+    ///     verification flow keeps its own coverage in EmailVerificationFlowTests), and returns
+    ///     an authenticated client. Verified-by-default so the §13.7 posting gate doesn't ripple
+    ///     through every flow test.
+    /// </summary>
+    public async Task<(HttpClient Client, string Username)> RegisterVerifiedClientAsync(string? username = null)
+    {
+        factory.Clock.Reset();
+        var client = factory.CreateClient();
+        var email = UniqueEmail();
+        var name = username ?? NewUsername();
+        await Register(client, email, name);
+        await MarkVerifiedAsync(email);
+        var login = await Login(client, email);
+        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
+        return (client, name);
+    }
+
+    public async Task MarkVerifiedAsync(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.Email == email);
+        user.MarkEmailVerified(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
     }
 
     public async Task AssertUser(string email, Action<User> assert)

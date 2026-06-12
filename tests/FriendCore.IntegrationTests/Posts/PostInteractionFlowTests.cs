@@ -8,17 +8,8 @@ namespace FriendCore.IntegrationTests.Posts;
 
 public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<HttpClient> AuthedClient()
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        await AuthScenarios.Register(client, email, AuthScenarios.NewUsername());
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return client;
-    }
+    private async Task<HttpClient> AuthedClient() =>
+        (await new AuthScenarios(factory).RegisterVerifiedClientAsync()).Client;
 
     private static async Task<string> CreatePost(HttpClient client, string content = "a post")
     {

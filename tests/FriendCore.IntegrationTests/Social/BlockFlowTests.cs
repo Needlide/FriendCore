@@ -9,17 +9,8 @@ namespace FriendCore.IntegrationTests.Social;
 /// <summary>Spec §8: full mutual block, follow sever with server-driven confirmation, 404-not-403.</summary>
 public class BlockFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<HttpClient> RegisterClient(string username)
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        await AuthScenarios.Register(client, email, username);
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return client;
-    }
+    private async Task<HttpClient> RegisterClient(string username) =>
+        (await new AuthScenarios(factory).RegisterVerifiedClientAsync(username)).Client;
 
     [Fact]
     public async Task Block_WithoutFollowRelationship_BlocksImmediately_AndHidesProfilesBothWays()

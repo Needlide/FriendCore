@@ -17,17 +17,8 @@ public class MediaUploadFlowTests(FriendCoreApiFactory factory) : IClassFixture<
     private static readonly byte[] JpegBytes =
         [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01];
 
-    private async Task<HttpClient> AuthedClient()
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        await AuthScenarios.Register(client, email, AuthScenarios.NewUsername());
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return client;
-    }
+    private async Task<HttpClient> AuthedClient() =>
+        (await new AuthScenarios(factory).RegisterVerifiedClientAsync()).Client;
 
     private static MultipartFormDataContent Upload(
         byte[] bytes,

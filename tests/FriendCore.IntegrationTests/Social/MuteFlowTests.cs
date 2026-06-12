@@ -12,18 +12,8 @@ namespace FriendCore.IntegrationTests.Social;
 /// </summary>
 public class MuteFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<(HttpClient Client, string Username)> RegisterClient()
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        var username = AuthScenarios.NewUsername();
-        await AuthScenarios.Register(client, email, username);
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return (client, username);
-    }
+    private Task<(HttpClient Client, string Username)> RegisterClient() =>
+        new AuthScenarios(factory).RegisterVerifiedClientAsync();
 
     private static async Task<string> CreatePost(HttpClient client, string content)
     {

@@ -11,17 +11,8 @@ namespace FriendCore.IntegrationTests.Media;
 /// <summary>Spec §7 management endpoints: media deletion and safety reporting (§7.4 layer 2).</summary>
 public class MediaManagementFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<HttpClient> AuthedClient()
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        await AuthScenarios.Register(client, email, AuthScenarios.NewUsername());
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return client;
-    }
+    private async Task<HttpClient> AuthedClient() =>
+        (await new AuthScenarios(factory).RegisterVerifiedClientAsync()).Client;
 
     private static async Task<string> UploadReadyMedia(HttpClient client)
     {

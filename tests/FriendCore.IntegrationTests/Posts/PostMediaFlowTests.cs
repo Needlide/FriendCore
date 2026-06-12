@@ -13,18 +13,8 @@ namespace FriendCore.IntegrationTests.Posts;
 /// </summary>
 public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<(HttpClient Client, string Username)> AuthedClient()
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        var username = AuthScenarios.NewUsername();
-        await AuthScenarios.Register(client, email, username);
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return (client, username);
-    }
+    private Task<(HttpClient Client, string Username)> AuthedClient() =>
+        new AuthScenarios(factory).RegisterVerifiedClientAsync();
 
     /// <summary>Uploads a real image and waits until it is Ready; returns its id.</summary>
     private static async Task<string> UploadReadyMedia(HttpClient client, int width = 200, int height = 100)

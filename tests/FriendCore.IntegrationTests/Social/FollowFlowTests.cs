@@ -8,17 +8,8 @@ namespace FriendCore.IntegrationTests.Social;
 
 public class FollowFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
-    private async Task<HttpClient> RegisterClient(string username)
-    {
-        factory.Clock.Reset();
-        var client = factory.CreateClient();
-        var email = AuthScenarios.UniqueEmail();
-        await AuthScenarios.Register(client, email, username);
-        var login = await AuthScenarios.Login(client, email);
-        var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        return client;
-    }
+    private async Task<HttpClient> RegisterClient(string username) =>
+        (await new AuthScenarios(factory).RegisterVerifiedClientAsync(username)).Client;
 
     private async Task RegisterUser(string username)
     {
