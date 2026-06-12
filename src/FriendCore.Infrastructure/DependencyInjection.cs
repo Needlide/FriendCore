@@ -2,6 +2,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Options;
+using FriendCore.Domain.Discovery;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IFollowRepository, FollowRepository>();
         services.AddScoped<IBlockRepository, BlockRepository>();
         services.AddScoped<IMuteRepository, MuteRepository>();
+        services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddHostedService<TagMaintenanceService>();
