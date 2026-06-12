@@ -24,10 +24,14 @@ internal sealed class GetHomeFeedQueryHandler(
             return CommonErrors.Unauthorized;
 
         var cursor = PostCursor.Decode(request.Cursor);
+        var viewer = await userRepository.GetByIdAsync(userId, cancellationToken);
+        if (viewer is null)
+            return CommonErrors.Unauthorized;
+
         var preferences = await userRepository.GetPreferencesAsync(userId, cancellationToken);
         var keywordFilters = preferences?.KeywordFilters ?? [];
-        var posts = await postRepository.GetHomeFeedAsync(userId, keywordFilters, cursor, PageSize + 1,
-            cancellationToken);
+        var posts = await postRepository.GetHomeFeedAsync(
+            userId, keywordFilters, viewer.ContentPreference, cursor, PageSize + 1, cancellationToken);
 
         var hasMore = posts.Count > PageSize;
         var page = hasMore ? posts.Take(PageSize).ToList() : posts;

@@ -496,12 +496,6 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
-                    b.Property<string>("ContentPreference")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("content_preference");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

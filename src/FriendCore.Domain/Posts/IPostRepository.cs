@@ -26,6 +26,7 @@ public interface IPostRepository
     Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
         IReadOnlyList<string> keywordFilters,
+        Users.ContentPreference contentPreference,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default);

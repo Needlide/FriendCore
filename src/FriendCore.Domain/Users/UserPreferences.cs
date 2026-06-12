@@ -18,10 +18,23 @@ public sealed class UserPreferences
     public bool ReduceMotion { get; private set; }
     public bool DisableAutoplay { get; private set; } = true;
     public bool ReduceVisualNoise { get; private set; }
-    public ContentPreference ContentPreference { get; private set; } = ContentPreference.General;
     public IReadOnlyList<string> KeywordFilters => _keywordFilters;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public void UpdateAccessibility(
+        bool hideFlashingMedia,
+        bool reduceMotion,
+        bool disableAutoplay,
+        bool reduceVisualNoise,
+        DateTimeOffset now)
+    {
+        HideFlashingMedia = hideFlashingMedia;
+        ReduceMotion = reduceMotion;
+        DisableAutoplay = disableAutoplay;
+        ReduceVisualNoise = reduceVisualNoise;
+        UpdatedAt = now;
+    }
 
     /// <summary>
     ///     Whole-set replace (§13.6 keyword filter). Normalisation makes matching case-insensitive

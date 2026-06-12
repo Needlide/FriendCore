@@ -9,6 +9,7 @@ using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UnmuteUser;
 using FriendCore.Application.Users.Commands.UpdateKeywordFilters;
+using FriendCore.Application.Users.Commands.UpdatePreferences;
 using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetKeywordFilters;
 using FriendCore.Application.Users.Queries.GetFollowers;
@@ -93,6 +94,27 @@ public sealed class UsersController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new UnfollowUserCommand(username), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPatch("me/preferences")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdatePreferences(
+        [FromBody] UpdatePreferencesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new UpdatePreferencesCommand(
+                request.HideFlashingMedia,
+                request.ReduceMotion,
+                request.DisableAutoplay,
+                request.ReduceVisualNoise,
+                request.ContentPreference),
+            cancellationToken);
+
+        return result.ToActionResult();
     }
 
     [HttpGet("me/keyword-filters")]

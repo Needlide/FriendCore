@@ -1,4 +1,5 @@
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace FriendCore.Infrastructure.Persistence.Repositories;
@@ -69,6 +70,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
     public async Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
         IReadOnlyList<string> keywordFilters,
+        ContentPreference contentPreference,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default)
@@ -76,7 +78,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
         var query = context.Posts
             .Where(post => context.Follows.Any(follow =>
                 follow.FollowerId == userId && follow.FollowedId == post.AuthorId))
-            .VisibleTo(context, userId, keywordFilters);
+            .VisibleTo(context, userId, keywordFilters, contentPreference);
 
         if (cursor is { } before)
             query = query.Where(post =>

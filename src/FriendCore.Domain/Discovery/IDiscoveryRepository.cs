@@ -26,6 +26,7 @@ public interface IDiscoveryRepository
     Task<IReadOnlyList<Ulid>> GetPostIdsAsync(
         Ulid viewerId,
         IReadOnlyList<string> keywordFilters,
+        Users.ContentPreference contentPreference,
         int limit,
         CancellationToken cancellationToken = default);
 }

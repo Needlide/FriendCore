@@ -99,6 +99,12 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         return Result.Success;
     }
 
+    public void SetContentPreference(ContentPreference preference, DateTimeOffset at)
+    {
+        ContentPreference = preference;
+        UpdatedAt = at;
+    }
+
     public ErrorOr<Success> AddProfileTag(Ulid tagId, TagTier tier, bool isPublic, DateTimeOffset at)
     {
         if (_profileTags.Any(tag => tag.TagId == tagId))

@@ -22,10 +22,6 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
         builder.Property(preferences => preferences.ReduceMotion).HasColumnName("reduce_motion");
         builder.Property(preferences => preferences.DisableAutoplay).HasColumnName("disable_autoplay");
         builder.Property(preferences => preferences.ReduceVisualNoise).HasColumnName("reduce_visual_noise");
-        builder.Property(preferences => preferences.ContentPreference)
-            .HasColumnName("content_preference")
-            .HasConversion<string>()
-            .HasMaxLength(32);
         // Maps to a Postgres text[] column; field access keeps the domain's IReadOnlyList intact.
         builder.Property(preferences => preferences.KeywordFilters)
             .HasColumnName("keyword_filters")

@@ -17,12 +17,14 @@ public class GetHomeFeedQueryHandlerTests
 
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
-    private readonly Ulid _userId = Ulid.NewUlid();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
+
+    private readonly User _viewer = UserTestFactory.Create(username: "viewer");
 
     public GetHomeFeedQueryHandlerTests()
     {
-        _currentUserService.UserId.Returns(_userId);
+        _currentUserService.UserId.Returns(_viewer.Id);
+        _userRepository.GetByIdAsync(_viewer.Id, Arg.Any<CancellationToken>()).Returns(_viewer);
     }
 
     private GetHomeFeedQueryHandler CreateHandler()
@@ -51,13 +53,13 @@ public class GetHomeFeedQueryHandlerTests
         var post = Post.Create(author.Id, "hello", ContentSensitivity.General, Now).Value;
 
         _postRepository.GetHomeFeedAsync(
-                _userId, Arg.Any<IReadOnlyList<string>>(), Arg.Any<(DateTimeOffset, Ulid)?>(), Arg.Any<int>(),
-                Arg.Any<CancellationToken>())
+                _viewer.Id, Arg.Any<IReadOnlyList<string>>(), Arg.Any<ContentPreference>(),
+                Arg.Any<(DateTimeOffset, Ulid)?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([post]);
         _userRepository.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([author]);
         _postRepository
-            .GetLikedPostIdsAsync(_userId, Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+            .GetLikedPostIdsAsync(_viewer.Id, Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([post.Id]);
 
         var result = await CreateHandler().Handle(new GetHomeFeedQuery(null), CancellationToken.None);

@@ -1,5 +1,6 @@
 using FriendCore.Domain.Discovery;
 using FriendCore.Domain.Tags;
+using FriendCore.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace FriendCore.Infrastructure.Persistence.Repositories;
@@ -66,6 +67,7 @@ public sealed class DiscoveryRepository(AppDbContext context) : IDiscoveryReposi
     public async Task<IReadOnlyList<Ulid>> GetPostIdsAsync(
         Ulid viewerId,
         IReadOnlyList<string> keywordFilters,
+        ContentPreference contentPreference,
         int limit,
         CancellationToken cancellationToken = default)
     {
@@ -82,7 +84,7 @@ public sealed class DiscoveryRepository(AppDbContext context) : IDiscoveryReposi
             .Where(post => !context.Follows.Any(follow =>
                 follow.FollowerId == viewerId && follow.FollowedId == post.AuthorId))
             .Where(post => post.Tags.Any(tag => viewerTagIds.Contains(tag.TagId)))
-            .VisibleTo(context, viewerId, keywordFilters)
+            .VisibleTo(context, viewerId, keywordFilters, contentPreference)
             .OrderByDescending(post => post.CreatedAt)
             .ThenByDescending(post => post.Id)
             .Take(limit)

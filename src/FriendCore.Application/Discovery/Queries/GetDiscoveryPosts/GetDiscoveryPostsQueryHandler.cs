@@ -39,9 +39,14 @@ internal sealed class GetDiscoveryPostsQueryHandler(
             $"discovery:posts:{userId}",
             async token =>
             {
+                var viewer = await userRepository.GetByIdAsync(userId, token);
                 var preferences = await userRepository.GetPreferencesAsync(userId, token);
                 var ids = await discoveryRepository.GetPostIdsAsync(
-                    userId, preferences?.KeywordFilters ?? [], MaxResults, token);
+                    userId,
+                    preferences?.KeywordFilters ?? [],
+                    viewer?.ContentPreference ?? Domain.Users.ContentPreference.General,
+                    MaxResults,
+                    token);
                 return ids.Select(id => id.ToString()).ToList();
             },
             CacheTtl,

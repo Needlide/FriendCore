@@ -1,4 +1,5 @@
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace FriendCore.Infrastructure.Persistence;
@@ -17,7 +18,8 @@ internal static class ContentVisibilityExtensions
         this IQueryable<Post> posts,
         AppDbContext context,
         Ulid viewerId,
-        IReadOnlyList<string> keywordFilters)
+        IReadOnlyList<string> keywordFilters,
+        ContentPreference contentPreference)
     {
         // One-way mute (§13.6): hides the muted user's posts from this viewer only.
         posts = posts.Where(post =>
@@ -30,6 +32,20 @@ internal static class ContentVisibilityExtensions
                 post.Content == null
                 || !keywordFilters.Any(keyword => EF.Functions.ILike(post.Content!, "%" + keyword + "%")));
 
+        // §9.1: explicit/sensitive content filtered by the viewer's ContentPreference. Enums are
+        // stored as strings, where <= would compare alphabetically — hence an explicit IN-list.
+        var allowed = AllowedSensitivities(contentPreference);
+        if (allowed.Count < 3)
+            posts = posts.Where(post => allowed.Contains(post.Sensitivity));
+
         return posts;
     }
+
+    private static List<ContentSensitivity> AllowedSensitivities(ContentPreference preference) =>
+        preference switch
+        {
+            ContentPreference.General => [ContentSensitivity.General],
+            ContentPreference.Sensitive => [ContentSensitivity.General, ContentSensitivity.Sensitive],
+            _ => [ContentSensitivity.General, ContentSensitivity.Sensitive, ContentSensitivity.Explicit]
+        };
 }
