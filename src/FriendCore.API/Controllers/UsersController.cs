@@ -18,11 +18,13 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FriendCore.API.Controllers;
 
 [ApiController]
 [Route("api/v1/users")]
+[EnableRateLimiting(RateLimitingExtensions.ApiPolicy)]
 public sealed class UsersController(ISender sender) : ControllerBase
 {
     [HttpGet("{username}")]
