@@ -7,4 +7,7 @@ public interface IMuteRepository
     Task AddAsync(Mute mute, CancellationToken cancellationToken = default);
 
     Task<bool> RemoveAsync(Ulid muterId, Ulid mutedId, CancellationToken cancellationToken = default);
+
+    // Ids of every user that muterId has muted.
+    Task<IReadOnlyList<Ulid>> GetMutedIdsAsync(Ulid muterId, CancellationToken cancellationToken = default);
 }

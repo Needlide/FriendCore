@@ -18,6 +18,16 @@ public sealed class MuteRepository(AppDbContext context) : IMuteRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Ulid>> GetMutedIdsAsync(
+        Ulid muterId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Mutes
+            .Where(mute => mute.MuterId == muterId)
+            .Select(mute => mute.MutedId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> RemoveAsync(Ulid muterId, Ulid mutedId, CancellationToken cancellationToken = default)
     {
         var mute = await context.Mutes.FirstOrDefaultAsync(

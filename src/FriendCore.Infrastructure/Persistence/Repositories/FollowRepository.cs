@@ -20,6 +20,16 @@ public sealed class FollowRepository(AppDbContext context) : IFollowRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Ulid>> GetFollowedIdsAsync(
+        Ulid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Follows
+            .Where(follow => follow.FollowerId == userId)
+            .Select(follow => follow.FollowedId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Follow follow, CancellationToken cancellationToken = default)
     {
         await context.Follows.AddAsync(follow, cancellationToken);

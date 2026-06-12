@@ -13,4 +13,7 @@ public interface IBlockRepository
     Task AddAndRemoveFollowsAsync(Block block, CancellationToken cancellationToken = default);
 
     Task<bool> RemoveAsync(Ulid blockerId, Ulid blockedId, CancellationToken cancellationToken = default);
+
+    // Ids of every user with a block relationship (either direction) with userId.
+    Task<IReadOnlyList<Ulid>> GetCounterpartIdsAsync(Ulid userId, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,8 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Models;
 using FriendCore.Application.Discovery.Queries.GetDiscoveryPeople;
 using FriendCore.Domain.Discovery;
+using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
 using NSubstitute;
 
@@ -10,15 +12,32 @@ public class GetDiscoveryPeopleQueryHandlerTests
 {
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IDiscoveryRepository _discoveryRepository = Substitute.For<IDiscoveryRepository>();
+    private readonly IFollowRepository _followRepository = Substitute.For<IFollowRepository>();
+    private readonly IMuteRepository _muteRepository = Substitute.For<IMuteRepository>();
+    private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
+    private readonly ICacheService _cacheService = Substitute.For<ICacheService>();
     private readonly Ulid _userId = Ulid.NewUlid();
 
     public GetDiscoveryPeopleQueryHandlerTests()
     {
         _currentUserService.UserId.Returns(_userId);
+        _followRepository.GetFollowedIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([]);
+        _muteRepository.GetMutedIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([]);
+        _blockRepository.GetCounterpartIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([]);
+
+        // Default cache behaviour: miss — invoke the factory (the live-query path).
+        _cacheService.GetOrSetAsync(
+                Arg.Any<string>(),
+                Arg.Any<Func<CancellationToken, Task<List<DiscoveryPersonResponse>>>>(),
+                Arg.Any<TimeSpan?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<List<DiscoveryPersonResponse>>>>()(
+                CancellationToken.None));
     }
 
     private GetDiscoveryPeopleQueryHandler CreateHandler() =>
-        new(_currentUserService, _discoveryRepository);
+        new(_currentUserService, _discoveryRepository, _followRepository, _muteRepository, _blockRepository,
+            _cacheService);
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -57,14 +76,55 @@ public class GetDiscoveryPeopleQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsEmptyList_WhenNoCandidates()
+    public async Task Handle_ServesFromCache_WithoutQueryingTheRepository()
     {
-        _discoveryRepository.GetPeopleAsync(_userId, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns([]);
+        var cached = new List<DiscoveryPersonResponse>
+        {
+            new(Ulid.NewUlid().ToString(), "cached", "Cached", null, 10)
+        };
+        _cacheService.GetOrSetAsync(
+                $"discovery:people:{_userId}",
+                Arg.Any<Func<CancellationToken, Task<List<DiscoveryPersonResponse>>>>(),
+                Arg.Any<TimeSpan?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(cached);
 
         var result = await CreateHandler().Handle(new GetDiscoveryPeopleQuery(), CancellationToken.None);
 
         Assert.False(result.IsError);
-        Assert.Empty(result.Value.People);
+        Assert.Equal("cached", Assert.Single(result.Value.People).Username);
+        await _discoveryRepository.DidNotReceiveWithAnyArgs().GetPeopleAsync(default, default!, default);
+    }
+
+    [Fact]
+    public async Task Handle_DropsStaleCachedEntries_ForCurrentExclusions()
+    {
+        // The cached list still contains users the viewer has since blocked, muted, or followed —
+        // the serve-time re-check must drop all three without waiting for the TTL.
+        var blockedId = Ulid.NewUlid();
+        var mutedId = Ulid.NewUlid();
+        var followedId = Ulid.NewUlid();
+        var keptId = Ulid.NewUlid();
+        var cached = new List<DiscoveryPersonResponse>
+        {
+            new(blockedId.ToString(), "blocked", "B", null, 13),
+            new(mutedId.ToString(), "muted", "M", null, 10),
+            new(followedId.ToString(), "followed", "F", null, 3),
+            new(keptId.ToString(), "kept", "K", null, 3)
+        };
+        _cacheService.GetOrSetAsync(
+                Arg.Any<string>(),
+                Arg.Any<Func<CancellationToken, Task<List<DiscoveryPersonResponse>>>>(),
+                Arg.Any<TimeSpan?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(cached);
+        _blockRepository.GetCounterpartIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([blockedId]);
+        _muteRepository.GetMutedIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([mutedId]);
+        _followRepository.GetFollowedIdsAsync(_userId, Arg.Any<CancellationToken>()).Returns([followedId]);
+
+        var result = await CreateHandler().Handle(new GetDiscoveryPeopleQuery(), CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Equal("kept", Assert.Single(result.Value.People).Username);
     }
 }

@@ -134,4 +134,29 @@ public class DiscoveryPeopleFlowTests(FriendCoreApiFactory factory) : IClassFixt
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task People_BlockedOrFollowedAfterAFirstCall_DropOutOnTheNext()
+    {
+        // NOTE: the integration factory swaps ICacheService for a no-op (no Redis container),
+        // so this exercises the full request path but NOT cache staleness — the
+        // stale-cache-vs-serve-time-exclusions guarantee is pinned by the handler unit test
+        // Handle_DropsStaleCachedEntries_ForCurrentExclusions.
+        var tag = UniqueTag();
+        var (viewer, _) = await RegisterClient();
+        await SetTags(viewer, (tag, "Primary", true));
+        var toBlock = await RegisterClient();
+        await SetTags(toBlock.Client, (tag, "Primary", true));
+        var toFollow = await RegisterClient();
+        await SetTags(toFollow.Client, (tag, "Primary", true));
+
+        var primed = (await GetPeople(viewer)).People;
+        Assert.Equal(2, primed.Count);
+
+        await viewer.PostAsync($"/api/v1/users/{toBlock.Username}/block", content: null);
+        await viewer.PostAsync($"/api/v1/users/{toFollow.Username}/follow", content: null);
+
+        var afterActions = (await GetPeople(viewer)).People;
+        Assert.Empty(afterActions);
+    }
 }
