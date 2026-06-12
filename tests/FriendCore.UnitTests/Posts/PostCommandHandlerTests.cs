@@ -25,7 +25,7 @@ public class PostCommandHandlerTests
     private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
     private readonly ITagNormalizer _tagNormalizer = Substitute.For<ITagNormalizer>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
-    private readonly User _author = UserTestFactory.Create();
+    private readonly User _author = UserTestFactory.CreateVerified();
 
     public PostCommandHandlerTests()
     {
@@ -65,6 +65,23 @@ public class PostCommandHandlerTests
 
     private DeletePostCommandHandler DeleteHandler() =>
         new(_currentUserService, _postRepository, _tagRepository);
+
+    [Fact]
+    public async Task Create_ReturnsEmailNotVerified_WhenAuthorUnverified()
+    {
+        // §13.7 gate applies to posting only; comment/like handlers deliberately have no check.
+        var unverified = UserTestFactory.Create(username: "unverified", email: "unverified@example.com");
+        _currentUserService.UserId.Returns(unverified.Id);
+        _userRepository.GetByIdAsync(unverified.Id, Arg.Any<CancellationToken>()).Returns(unverified);
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("hello", PostSensitivity.General, [], []),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("User.EmailNotVerified", result.FirstError.Code);
+        await _postRepository.DidNotReceive().AddAsync(Arg.Any<Post>(), Arg.Any<CancellationToken>());
+    }
 
     [Fact]
     public async Task Create_WithTags_AttachesResolvedTags_AndRecordsUsage()

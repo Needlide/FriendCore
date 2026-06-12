@@ -32,6 +32,12 @@ internal sealed class CreatePostCommandHandler(
         if (author is null)
             return UserErrors.NotFound;
 
+        // §13.7: email verification required before POSTING only — comments, likes, and follows
+        // stay open to unverified accounts (deliberate comfort-first product decision; revisit
+        // during closed testing).
+        if (!author.IsVerified)
+            return UserErrors.EmailNotVerified;
+
         // Fail before tag resolution persists anything: resolving creates missing tags, and an
         // over-cap post must not leave orphaned tag rows behind.
         if (request.Tags.Count > TagLimits.MaxPostTags)
