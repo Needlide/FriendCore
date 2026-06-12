@@ -56,8 +56,9 @@ public class MuteFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendC
         Assert.Equal(HttpStatusCode.OK, profile.StatusCode);
         var directPost = await aClient.GetAsync($"/api/v1/posts/{bPostId}");
         Assert.Equal(HttpStatusCode.OK, directPost.StatusCode);
-        var userPosts = await aClient.GetAsync($"/api/v1/users/{bUsername}/posts");
-        Assert.Equal(HttpStatusCode.OK, userPosts.StatusCode);
+        // The muted post itself is still listed when A deliberately visits B's profile posts.
+        var userPosts = await aClient.GetFromJsonAsync<PostFeedResponse>($"/api/v1/users/{bUsername}/posts");
+        Assert.Contains(userPosts!.Posts, p => p.Id == bPostId);
     }
 
     [Fact]
