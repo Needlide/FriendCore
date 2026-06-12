@@ -26,6 +26,12 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
             .HasColumnName("content_preference")
             .HasConversion<string>()
             .HasMaxLength(32);
+        // Maps to a Postgres text[] column; field access keeps the domain's IReadOnlyList intact.
+        builder.Property(preferences => preferences.KeywordFilters)
+            .HasColumnName("keyword_filters")
+            .HasField("_keywordFilters")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Property(preferences => preferences.CreatedAt).HasColumnName("created_at");
         builder.Property(preferences => preferences.UpdatedAt).HasColumnName("updated_at");
     }

@@ -51,7 +51,8 @@ public class GetHomeFeedQueryHandlerTests
         var post = Post.Create(author.Id, "hello", ContentSensitivity.General, Now).Value;
 
         _postRepository.GetHomeFeedAsync(
-                _userId, Arg.Any<(DateTimeOffset, Ulid)?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                _userId, Arg.Any<IReadOnlyList<string>>(), Arg.Any<(DateTimeOffset, Ulid)?>(), Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
             .Returns([post]);
         _userRepository.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([author]);

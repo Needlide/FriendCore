@@ -13,6 +13,8 @@ public interface IUserRepository
     Task<User?> GetByUsernameSlugIgnoringBlocksAsync(string usernameSlug, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(Ulid tagId, CancellationToken cancellationToken = default);
+    Task<UserPreferences?> GetPreferencesAsync(Ulid userId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default);
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
+    Task UpdatePreferencesAsync(CancellationToken cancellationToken = default);
 }

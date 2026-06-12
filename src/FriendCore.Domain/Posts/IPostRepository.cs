@@ -16,9 +16,11 @@ public interface IPostRepository
         int limit,
         CancellationToken cancellationToken = default);
 
-    // Posts authored by users the given user follows, newest first.
+    // Posts authored by users the given user follows, newest first. Posts whose content matches
+    // any keyword filter (case-insensitive substring) are excluded before the page is cut.
     Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
+        IReadOnlyList<string> keywordFilters,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default);

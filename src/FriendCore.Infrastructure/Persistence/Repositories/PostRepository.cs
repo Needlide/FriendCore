@@ -54,6 +54,7 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
 
     public async Task<IReadOnlyList<Post>> GetHomeFeedAsync(
         Ulid userId,
+        IReadOnlyList<string> keywordFilters,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,
         int limit,
         CancellationToken cancellationToken = default)
@@ -63,6 +64,13 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             // One-way mute (§13.6): excluded from the feed only — deliberately not a global
             // filter, so direct profile and post access stay visible.
             && !context.Mutes.Any(mute => mute.MuterId == userId && mute.MutedId == post.AuthorId));
+
+        // Filtering happens in SQL, before the cursor cut, so pages stay full and the cursor
+        // never points at a hidden post. Media-only posts (null content) are never keyword-hidden.
+        if (keywordFilters.Count > 0)
+            query = query.Where(post =>
+                post.Content == null
+                || !keywordFilters.Any(keyword => EF.Functions.ILike(post.Content!, "%" + keyword + "%")));
 
         if (cursor is { } before)
             query = query.Where(post =>

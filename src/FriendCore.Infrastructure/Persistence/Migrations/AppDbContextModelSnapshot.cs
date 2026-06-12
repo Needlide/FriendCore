@@ -514,6 +514,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("hide_flashing_media");
 
+                    b.PrimitiveCollection<string[]>("KeywordFilters")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("keyword_filters");
+
                     b.Property<bool>("ReduceMotion")
                         .HasColumnType("boolean")
                         .HasColumnName("reduce_motion");

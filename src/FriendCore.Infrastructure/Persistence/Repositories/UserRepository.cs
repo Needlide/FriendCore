@@ -61,6 +61,13 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
             .ToListAsync(cancellationToken);
     }
 
+    public Task<UserPreferences?> GetPreferencesAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        return context.UserPreferences.FirstOrDefaultAsync(
+            preferences => preferences.UserId == userId,
+            cancellationToken);
+    }
+
     public async Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default)
     {
         await context.Users.AddAsync(user, cancellationToken);
@@ -73,5 +80,10 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
     {
         await context.SaveChangesAsync(cancellationToken);
         await domainEventDispatcher.DispatchEventsAsync(cancellationToken);
+    }
+
+    public Task UpdatePreferencesAsync(CancellationToken cancellationToken = default)
+    {
+        return context.SaveChangesAsync(cancellationToken);
     }
 }

@@ -38,6 +38,14 @@ public static class UserErrors
     public static Error CannotMuteSelf =>
         Error.Validation("User.CannotMuteSelf", "You cannot mute yourself.");
 
+    public static Error TooManyKeywordFilters =>
+        Error.Validation("User.TooManyKeywordFilters",
+            $"You can have at most {UserPreferences.MaxKeywordFilters} keyword filters.");
+
+    public static Error KeywordFilterTooLong =>
+        Error.Validation("User.KeywordFilterTooLong",
+            $"Each keyword filter must be at most {UserPreferences.MaxKeywordFilterLength} characters.");
+
     public static Error BlockRequiresConfirmation =>
         Error.Conflict("User.BlockRequiresConfirmation",
             "A follow relationship exists with this user. Blocking will remove it; re-send with confirmed=true to proceed.");

@@ -8,7 +8,9 @@ using FriendCore.Application.Users.Commands.MuteUser;
 using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UnmuteUser;
+using FriendCore.Application.Users.Commands.UpdateKeywordFilters;
 using FriendCore.Application.Users.Commands.UpdateProfile;
+using FriendCore.Application.Users.Queries.GetKeywordFilters;
 using FriendCore.Application.Users.Queries.GetFollowers;
 using FriendCore.Application.Users.Queries.GetFollowing;
 using FriendCore.Application.Users.Queries.GetUserProfile;
@@ -89,6 +91,29 @@ public sealed class UsersController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new UnfollowUserCommand(username), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpGet("me/keyword-filters")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetKeywordFilters(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetKeywordFiltersQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPatch("me/keyword-filters")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateKeywordFilters(
+        [FromBody] UpdateKeywordFiltersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UpdateKeywordFiltersCommand(request.Keywords), cancellationToken);
+        return result.ToActionResult();
     }
 
     [HttpPost("{username}/block")]
