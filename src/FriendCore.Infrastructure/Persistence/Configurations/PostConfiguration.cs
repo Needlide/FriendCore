@@ -47,5 +47,28 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
             .HasForeignKey(postMedia => postMedia.PostId);
 
         builder.Navigation(post => post.Media).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Owned (auto-included), mirroring profile_tags on User.
+        builder.OwnsMany(post => post.Tags, postTag =>
+        {
+            postTag.ToTable("post_tags");
+            postTag.WithOwner().HasForeignKey(tag => tag.PostId);
+            postTag.HasKey(tag => new { tag.PostId, tag.TagId });
+
+            postTag.Property(tag => tag.PostId)
+                .HasColumnName("post_id")
+                .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
+
+            postTag.Property(tag => tag.TagId)
+                .HasColumnName("tag_id")
+                .HasConversion(id => id.ToString(), value => Ulid.Parse(value));
+
+            // Discovery scans posts by tag: (tag_id, post_id) makes that an index-only probe.
+            postTag.HasIndex(tag => new { tag.TagId, tag.PostId });
+
+            postTag.Property(tag => tag.AddedAt).HasColumnName("added_at");
+        });
+
+        builder.Navigation(post => post.Tags).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

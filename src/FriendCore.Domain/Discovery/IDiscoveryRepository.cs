@@ -14,4 +14,18 @@ public interface IDiscoveryRepository
         Ulid viewerId,
         int limit,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     §9.2 posts tab: ids of recent posts carrying at least one tag from the viewer's
+    ///     profile tags (any tier — the posts tab is unweighted recency), authored by users the
+    ///     viewer does not follow. Excludes own posts, muted authors, and keyword-filter matches;
+    ///     blocked authors fall out of the global query filter. Ids only — callers rehydrate
+    ///     through the normal post lookups so soft-deletes and blocks stay live even when the id
+    ///     list is served from a cache.
+    /// </summary>
+    Task<IReadOnlyList<Ulid>> GetPostIdsAsync(
+        Ulid viewerId,
+        IReadOnlyList<string> keywordFilters,
+        int limit,
+        CancellationToken cancellationToken = default);
 }

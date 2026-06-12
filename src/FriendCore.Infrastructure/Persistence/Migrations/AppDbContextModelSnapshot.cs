@@ -578,6 +578,35 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.Navigation("Variants");
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Posts.Post", b =>
+                {
+                    b.OwnsMany("FriendCore.Domain.Tags.PostTag", "Tags", b1 =>
+                        {
+                            b1.Property<string>("PostId")
+                                .HasColumnType("text")
+                                .HasColumnName("post_id");
+
+                            b1.Property<string>("TagId")
+                                .HasColumnType("text")
+                                .HasColumnName("tag_id");
+
+                            b1.Property<DateTimeOffset>("AddedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("added_at");
+
+                            b1.HasKey("PostId", "TagId");
+
+                            b1.HasIndex("TagId", "PostId");
+
+                            b1.ToTable("post_tags", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("PostId");
+                        });
+
+                    b.Navigation("Tags");
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Posts.PostMedia", b =>
                 {
                     b.HasOne("FriendCore.Domain.Posts.Post", null)

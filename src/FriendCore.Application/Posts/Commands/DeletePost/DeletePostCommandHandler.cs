@@ -2,13 +2,15 @@ using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Tags;
 using MediatR;
 
 namespace FriendCore.Application.Posts.Commands.DeletePost;
 
 internal sealed class DeletePostCommandHandler(
     ICurrentUserService currentUserService,
-    IPostRepository postRepository)
+    IPostRepository postRepository,
+    ITagRepository tagRepository)
     : IRequestHandler<DeletePostCommand, ErrorOr<Success>>
 {
     public async Task<ErrorOr<Success>> Handle(DeletePostCommand request, CancellationToken cancellationToken)
@@ -22,6 +24,16 @@ internal sealed class DeletePostCommandHandler(
 
         if (post.AuthorId != userId)
             return PostErrors.NotAuthor;
+
+        // Usage counts come back down with the post; persisted by SoftDeleteAsync's SaveChanges
+        // over the shared context.
+        if (post.Tags.Count > 0)
+        {
+            var tags = await tagRepository.GetByIdsAsync(
+                post.Tags.Select(tag => tag.TagId).ToList(), cancellationToken);
+            foreach (var tag in tags)
+                tag.RecordPostRemoved();
+        }
 
         await postRepository.SoftDeleteAsync(post, cancellationToken);
         return Result.Success;

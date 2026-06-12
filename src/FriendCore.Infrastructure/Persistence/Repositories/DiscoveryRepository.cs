@@ -62,4 +62,31 @@ public sealed class DiscoveryRepository(AppDbContext context) : IDiscoveryReposi
             .Select(candidate => new DiscoveryCandidate(candidate.User, candidate.Score))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<Ulid>> GetPostIdsAsync(
+        Ulid viewerId,
+        IReadOnlyList<string> keywordFilters,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var viewerTagIds = await context.Users
+            .Where(user => user.Id == viewerId)
+            .SelectMany(user => user.ProfileTags.Select(tag => tag.TagId))
+            .ToListAsync(cancellationToken);
+
+        if (viewerTagIds.Count == 0)
+            return [];
+
+        return await context.Posts
+            .Where(post => post.AuthorId != viewerId)
+            .Where(post => !context.Follows.Any(follow =>
+                follow.FollowerId == viewerId && follow.FollowedId == post.AuthorId))
+            .Where(post => post.Tags.Any(tag => viewerTagIds.Contains(tag.TagId)))
+            .VisibleTo(context, viewerId, keywordFilters)
+            .OrderByDescending(post => post.CreatedAt)
+            .ThenByDescending(post => post.Id)
+            .Take(limit)
+            .Select(post => post.Id)
+            .ToListAsync(cancellationToken);
+    }
 }

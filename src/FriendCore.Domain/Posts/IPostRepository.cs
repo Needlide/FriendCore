@@ -4,6 +4,11 @@ public interface IPostRepository
 {
     Task<Post?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
 
+    // Order is not guaranteed; callers re-order. Soft-deleted and block-filtered posts drop out.
+    Task<IReadOnlyList<Post>> GetByIdsAsync(
+        IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Post post, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(CancellationToken cancellationToken = default);

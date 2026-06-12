@@ -1,4 +1,5 @@
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Tags;
 
 namespace FriendCore.UnitTests.Posts;
 
@@ -88,6 +89,41 @@ public class PostTests
 
         Assert.True(result.IsError);
         Assert.Equal("Post.ContentTooLong", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Create_AttachesTags_InOrder()
+    {
+        var tagIds = new[] { Ulid.NewUlid(), Ulid.NewUlid() };
+
+        var result = Post.Create(Ulid.NewUlid(), "tagged", ContentSensitivity.General, Now, tagIds: tagIds);
+
+        Assert.False(result.IsError);
+        Assert.Equal(tagIds, result.Value.Tags.Select(tag => tag.TagId));
+        Assert.All(result.Value.Tags, tag => Assert.Equal(result.Value.Id, tag.PostId));
+    }
+
+    [Fact]
+    public void Create_RejectsMoreThanMaxTags()
+    {
+        var tagIds = Enumerable.Range(0, TagLimits.MaxPostTags + 1).Select(_ => Ulid.NewUlid()).ToList();
+
+        var result = Post.Create(Ulid.NewUlid(), "tagged", ContentSensitivity.General, Now, tagIds: tagIds);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Post.TooManyTags", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Create_RejectsDuplicateTags()
+    {
+        var tagId = Ulid.NewUlid();
+
+        var result = Post.Create(
+            Ulid.NewUlid(), "tagged", ContentSensitivity.General, Now, tagIds: [tagId, tagId]);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Post.DuplicateTags", result.FirstError.Code);
     }
 
     [Fact]

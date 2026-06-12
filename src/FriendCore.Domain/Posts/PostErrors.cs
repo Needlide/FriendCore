@@ -22,6 +22,13 @@ public static class PostErrors
     public static Error DuplicateMedia =>
         Error.Validation("Post.DuplicateMedia", "The same media item cannot be attached twice.");
 
+    public static Error TooManyTags =>
+        Error.Validation("Post.TooManyTags",
+            $"A post can have at most {Tags.TagLimits.MaxPostTags} tags.");
+
+    public static Error DuplicateTags =>
+        Error.Validation("Post.DuplicateTags", "The same tag cannot be attached twice.");
+
     public static Error ContentTooLong =>
         Error.Validation("Post.ContentTooLong", $"Post content must not exceed {MaxContentLength} characters.");
 

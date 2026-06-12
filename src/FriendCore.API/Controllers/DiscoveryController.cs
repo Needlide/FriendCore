@@ -1,5 +1,6 @@
 using FriendCore.API.Extensions;
 using FriendCore.Application.Discovery.Queries.GetDiscoveryPeople;
+using FriendCore.Application.Discovery.Queries.GetDiscoveryPosts;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,16 @@ public sealed class DiscoveryController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetPeople(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetDiscoveryPeopleQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("posts")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPosts(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetDiscoveryPostsQuery(), cancellationToken);
         return result.ToActionResult();
     }
 }

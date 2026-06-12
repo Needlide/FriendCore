@@ -2,9 +2,11 @@ using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Application.Posts.Common;
+using FriendCore.Application.Tags.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 using MediatR;
 
@@ -15,6 +17,8 @@ internal sealed class CreatePostCommandHandler(
     IUserRepository userRepository,
     IPostRepository postRepository,
     IMediaRepository mediaRepository,
+    ITagRepository tagRepository,
+    ITagNormalizer normalizer,
     PostMediaResponseFactory mediaResponseFactory,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<CreatePostCommand, ErrorOr<PostResponse>>
@@ -28,6 +32,11 @@ internal sealed class CreatePostCommandHandler(
         if (author is null)
             return UserErrors.NotFound;
 
+        // Fail before tag resolution persists anything: resolving creates missing tags, and an
+        // over-cap post must not leave orphaned tag rows behind.
+        if (request.Tags.Count > TagLimits.MaxPostTags)
+            return PostErrors.TooManyTags;
+
         // Parse is safe post-validation; the validator rejects malformed ids.
         var mediaIds = request.MediaIds.Select(Ulid.Parse).ToList();
 
@@ -35,10 +44,23 @@ internal sealed class CreatePostCommandHandler(
         if (mediaError is { } error)
             return error;
 
+        var now = dateTimeProvider.UtcNow;
+
+        var resolvedTags = await ResolveTagsAsync(request.Tags, userId, now, cancellationToken);
+        if (resolvedTags.IsError)
+            return resolvedTags.Errors;
+
+        var tags = resolvedTags.Value;
         var postResult = Post.Create(
-            userId, request.Content, MapSensitivity(request.Sensitivity), dateTimeProvider.UtcNow, mediaIds);
+            userId, request.Content, MapSensitivity(request.Sensitivity), now, mediaIds,
+            tags.Select(tag => tag.Id).ToList());
         if (postResult.IsError)
             return postResult.Errors;
+
+        // The tag entities are tracked by the same scoped context, so AddAsync's SaveChanges
+        // persists the post together with the usage-count bumps (profile-tags precedent).
+        foreach (var tag in tags)
+            tag.RecordPostAdded(now);
 
         var post = postResult.Value;
         await postRepository.AddAsync(post, cancellationToken);
@@ -46,6 +68,55 @@ internal sealed class CreatePostCommandHandler(
         var mediaByPost = await mediaResponseFactory.ForPostsAsync([post], cancellationToken);
         return PostResponse.Create(
             post, author, isLikedByCurrentUser: false, mediaByPost.GetValueOrDefault(post.Id, []));
+    }
+
+    // Same resolution flow as UpdateProfileTags (normalise → resolve aliases → create missing →
+    // attachable check); duplicated for now since the profile flow is interleaved with tier
+    // handling — extract a shared resolver when a third caller appears.
+    private async Task<ErrorOr<List<Tag>>> ResolveTagsAsync(
+        IReadOnlyList<string> tagNames,
+        Ulid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var tags = new List<Tag>(tagNames.Count);
+        var seenSlugs = new HashSet<string>();
+        var seenTagIds = new HashSet<Ulid>();
+        List<Tag> newTags = [];
+
+        foreach (var name in tagNames)
+        {
+            var normalized = normalizer.Normalize(name);
+            if (normalized.IsError)
+                return normalized.Errors;
+
+            if (!seenSlugs.Add(normalized.Value.Slug))
+                return TagErrors.Duplicate;
+
+            var tag = await tagRepository.GetBySlugResolvingAliasAsync(normalized.Value.Slug, cancellationToken);
+            if (tag is null)
+            {
+                tag = Tag.Create(normalized.Value.DisplayName, normalized.Value.Slug, userId, now);
+                newTags.Add(tag);
+            }
+
+            if (!tag.IsAttachable)
+                return TagErrors.Banned;
+
+            // Distinct slugs can still resolve to the same tag through aliases.
+            if (!seenTagIds.Add(tag.Id))
+                return TagErrors.Duplicate;
+
+            tags.Add(tag);
+        }
+
+        if (newTags.Count == 0)
+            return tags;
+
+        await tagRepository.AddRangeAsync(newTags, cancellationToken);
+        await tagRepository.UpdateAsync(cancellationToken);
+
+        return tags;
     }
 
     // Ownership, readiness, and single-use checks need the repositories, so they live here rather

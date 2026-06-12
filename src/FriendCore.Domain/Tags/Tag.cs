@@ -95,4 +95,19 @@ public sealed class Tag : AggregateRoot<Ulid>
 
         TotalCount = ProfileCount + PostCount;
     }
+
+    public void RecordPostAdded(DateTimeOffset at)
+    {
+        PostCount++;
+        TotalCount = ProfileCount + PostCount;
+        LastUsedAt = at;
+    }
+
+    public void RecordPostRemoved()
+    {
+        if (PostCount > 0)
+            PostCount--;
+
+        TotalCount = ProfileCount + PostCount;
+    }
 }

@@ -3,8 +3,10 @@ using FriendCore.Application.Common.Options;
 using FriendCore.Application.Posts.Commands.CreatePost;
 using FriendCore.Application.Posts.Commands.DeletePost;
 using FriendCore.Application.Posts.Common;
+using FriendCore.Application.Tags.Services;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
+using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
 using Microsoft.Extensions.Options;
@@ -20,6 +22,8 @@ public class PostCommandHandlerTests
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
     private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
+    private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
+    private readonly ITagNormalizer _tagNormalizer = Substitute.For<ITagNormalizer>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly User _author = UserTestFactory.Create();
 
@@ -38,8 +42,8 @@ public class PostCommandHandlerTests
             _mediaRepository,
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
         return new(
-            _currentUserService, _userRepository, _postRepository, _mediaRepository, mediaFactory,
-            _dateTimeProvider);
+            _currentUserService, _userRepository, _postRepository, _mediaRepository, _tagRepository,
+            _tagNormalizer, mediaFactory, _dateTimeProvider);
     }
 
     private MediaItem ReadyMedia(Ulid? uploaderId = null)
@@ -60,7 +64,75 @@ public class PostCommandHandlerTests
     }
 
     private DeletePostCommandHandler DeleteHandler() =>
-        new(_currentUserService, _postRepository);
+        new(_currentUserService, _postRepository, _tagRepository);
+
+    [Fact]
+    public async Task Create_WithTags_AttachesResolvedTags_AndRecordsUsage()
+    {
+        var existing = Tag.Create("Art", "art", Ulid.NewUlid(), Now);
+        _tagNormalizer.Normalize("Art").Returns(new NormalizedTag("Art", "art"));
+        _tagRepository.GetBySlugResolvingAliasAsync("art", Arg.Any<CancellationToken>()).Returns(existing);
+        Post? added = null;
+        await _postRepository.AddAsync(Arg.Do<Post>(p => added = p), Arg.Any<CancellationToken>());
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("tagged", PostSensitivity.General, [], ["Art"]),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Equal([existing.Id], added!.Tags.Select(tag => tag.TagId));
+        Assert.Equal(1, existing.PostCount);
+    }
+
+    [Fact]
+    public async Task Create_WithUnknownTag_CreatesIt()
+    {
+        _tagNormalizer.Normalize("brand-new").Returns(new NormalizedTag("brand-new", "brand-new"));
+        _tagRepository.GetBySlugResolvingAliasAsync("brand-new", Arg.Any<CancellationToken>())
+            .Returns((Tag?)null);
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("tagged", PostSensitivity.General, [], ["brand-new"]),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        await _tagRepository.Received(1).AddRangeAsync(
+            Arg.Is<IReadOnlyCollection<Tag>>(tags => tags.Single().Slug == "brand-new"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Create_RejectsTooManyTags_BeforeResolvingAnything()
+    {
+        // Resolution persists newly created tags; an over-cap request must fail before that.
+        var names = Enumerable.Range(0, TagLimits.MaxPostTags + 1).Select(i => $"tag-{i}").ToList();
+
+        var result = await CreateHandler().Handle(
+            new CreatePostCommand("tagged", PostSensitivity.General, [], names),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Post.TooManyTags", result.FirstError.Code);
+        _tagNormalizer.DidNotReceiveWithAnyArgs().Normalize(default!);
+    }
+
+    [Fact]
+    public async Task Delete_DecrementsTagUsage()
+    {
+        var tag = Tag.Create("Art", "art", Ulid.NewUlid(), Now);
+        tag.RecordPostAdded(Now);
+        var post = Post.Create(
+            _author.Id, "tagged", ContentSensitivity.General, Now, tagIds: [tag.Id]).Value;
+        _postRepository.GetByIdAsync(post.Id, Arg.Any<CancellationToken>()).Returns(post);
+        _tagRepository.GetByIdsAsync(
+                Arg.Is<IReadOnlyCollection<Ulid>>(ids => ids.Single() == tag.Id), Arg.Any<CancellationToken>())
+            .Returns([tag]);
+
+        var result = await DeleteHandler().Handle(new DeletePostCommand(post.Id), CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Equal(0, tag.PostCount);
+    }
 
     [Fact]
     public async Task Create_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -68,7 +140,7 @@ public class PostCommandHandlerTests
         _currentUserService.UserId.Returns((Ulid?)null);
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("hello", PostSensitivity.General, []),
+            new CreatePostCommand("hello", PostSensitivity.General, [], []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -82,7 +154,7 @@ public class PostCommandHandlerTests
         await _postRepository.AddAsync(Arg.Do<Post>(p => added = p), Arg.Any<CancellationToken>());
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("hello world", PostSensitivity.Sensitive, []),
+            new CreatePostCommand("hello world", PostSensitivity.Sensitive, [], []),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -106,7 +178,7 @@ public class PostCommandHandlerTests
 
         var result = await CreateHandler().Handle(
             new CreatePostCommand(null, PostSensitivity.General,
-                [first.Id.ToString(), second.Id.ToString()]),
+                [first.Id.ToString(), second.Id.ToString()], []),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -126,7 +198,7 @@ public class PostCommandHandlerTests
         MediaLookupReturns(processing);
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("text", PostSensitivity.General, [processing.Id.ToString()]),
+            new CreatePostCommand("text", PostSensitivity.General, [processing.Id.ToString()], []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -141,7 +213,7 @@ public class PostCommandHandlerTests
         MediaLookupReturns(foreign);
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("text", PostSensitivity.General, [foreign.Id.ToString()]),
+            new CreatePostCommand("text", PostSensitivity.General, [foreign.Id.ToString()], []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -154,7 +226,7 @@ public class PostCommandHandlerTests
         MediaLookupReturns(); // lookup yields nothing
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("text", PostSensitivity.General, [Ulid.NewUlid().ToString()]),
+            new CreatePostCommand("text", PostSensitivity.General, [Ulid.NewUlid().ToString()], []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -170,7 +242,7 @@ public class PostCommandHandlerTests
             .Returns([media.Id]);
 
         var result = await CreateHandler().Handle(
-            new CreatePostCommand("text", PostSensitivity.General, [media.Id.ToString()]),
+            new CreatePostCommand("text", PostSensitivity.General, [media.Id.ToString()], []),
             CancellationToken.None);
 
         Assert.True(result.IsError);
