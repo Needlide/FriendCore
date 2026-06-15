@@ -11,6 +11,9 @@ public interface IAdminAuditLogRepository
 
     Task<IReadOnlyList<AdminAuditLog>> GetRecentAsync(int limit, CancellationToken cancellationToken = default);
 
+    // Total moderator actions taken — the volume metric.
+    Task<int> CountAsync(CancellationToken cancellationToken = default);
+
     // Moderation history for one user (entries whose target is that user), newest first.
     Task<IReadOnlyList<AdminAuditLog>> GetForUserAsync(
         Ulid userId,

@@ -52,4 +52,24 @@ public sealed class ReportRepository(AppDbContext context) : IReportRepository
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<ReportMetrics> GetMetricsAsync(CancellationToken cancellationToken = default)
+    {
+        var total = await context.Reports.CountAsync(cancellationToken);
+        var pending = await context.Reports.CountAsync(r => r.Status == ReportStatus.Pending, cancellationToken);
+        var resolved = await context.Reports.CountAsync(r => r.Status == ReportStatus.Resolved, cancellationToken);
+        var dismissed = await context.Reports.CountAsync(r => r.Status == ReportStatus.Dismissed, cancellationToken);
+
+        // Averaged in memory over resolved/dismissed rows — fine at moderation volume.
+        var closed = await context.Reports
+            .Where(r => r.ResolvedAt != null)
+            .Select(r => new { r.CreatedAt, r.ResolvedAt })
+            .ToListAsync(cancellationToken);
+
+        var avgHours = closed.Count == 0
+            ? (double?)null
+            : closed.Average(r => (r.ResolvedAt!.Value - r.CreatedAt).TotalHours);
+
+        return new ReportMetrics(total, pending, resolved, dismissed, avgHours);
+    }
 }

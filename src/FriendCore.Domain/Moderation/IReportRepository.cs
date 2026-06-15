@@ -19,4 +19,6 @@ public interface IReportRepository
         ReportStatus? status,
         int limit,
         CancellationToken cancellationToken = default);
+
+    Task<ReportMetrics> GetMetricsAsync(CancellationToken cancellationToken = default);
 }

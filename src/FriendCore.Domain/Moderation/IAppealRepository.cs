@@ -15,4 +15,6 @@ public interface IAppealRepository
 
     // Pending appeals, soonest deadline first (§13.3 deadline tracking).
     Task<IReadOnlyList<Appeal>> GetQueueAsync(int limit, CancellationToken cancellationToken = default);
+
+    Task<AppealMetrics> GetMetricsAsync(CancellationToken cancellationToken = default);
 }
