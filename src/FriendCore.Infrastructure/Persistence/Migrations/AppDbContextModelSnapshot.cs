@@ -91,6 +91,75 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("media_items", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Messaging.Conversation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_message_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastMessageAt");
+
+                    b.ToTable("conversations", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.Message", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ConversationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_encrypted");
+
+                    b.Property<string>("SenderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "CreatedAt", "Id")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("messages", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Posts.Comment", b =>
                 {
                     b.Property<string>("Id")
@@ -570,6 +639,39 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.Conversation", b =>
+                {
+                    b.OwnsMany("FriendCore.Domain.Messaging.ConversationParticipant", "Participants", b1 =>
+                        {
+                            b1.Property<string>("ConversationId")
+                                .HasColumnType("text")
+                                .HasColumnName("conversation_id");
+
+                            b1.Property<string>("UserId")
+                                .HasColumnType("text")
+                                .HasColumnName("user_id");
+
+                            b1.Property<DateTimeOffset>("JoinedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("joined_at");
+
+                            b1.Property<DateTimeOffset?>("LastReadAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("last_read_at");
+
+                            b1.HasKey("ConversationId", "UserId");
+
+                            b1.HasIndex("UserId");
+
+                            b1.ToTable("conversation_participants", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ConversationId");
+                        });
+
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Posts.Post", b =>
