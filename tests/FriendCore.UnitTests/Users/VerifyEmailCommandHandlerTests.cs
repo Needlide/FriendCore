@@ -12,6 +12,7 @@ public class VerifyEmailCommandHandlerTests
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
     private readonly IEmailVerificationTokenHasher _tokenHasher = Substitute.For<IEmailVerificationTokenHasher>();
+    private readonly IRefreshTokenService _refreshTokenService = Substitute.For<IRefreshTokenService>();
 
     private readonly IEmailVerificationTokenRepository _tokenRepository =
         Substitute.For<IEmailVerificationTokenRepository>();
@@ -24,12 +25,14 @@ public class VerifyEmailCommandHandlerTests
         _tokenHasher.Hash(Arg.Any<string>()).Returns(call => $"hash::{call.Arg<string>()}");
         _jwtTokenService.GenerateAccessToken(Arg.Any<User>())
             .Returns(new AuthTokenResult("access-token", Now.AddHours(1)));
+        _refreshTokenService.IssueAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
+            .Returns(new IssuedRefreshToken("refresh-token", Now.AddDays(60)));
     }
 
     private VerifyEmailCommandHandler CreateHandler()
     {
         return new VerifyEmailCommandHandler(_tokenRepository, _userRepository, _tokenHasher, _jwtTokenService,
-            _dateTimeProvider);
+            _refreshTokenService, _dateTimeProvider);
     }
 
     [Fact]
@@ -103,9 +106,9 @@ public class VerifyEmailCommandHandlerTests
         var result = await CreateHandler().Handle(new VerifyEmailCommand("tok"), CancellationToken.None);
 
         Assert.False(result.IsError);
-        Assert.Equal("access-token", result.Value.AccessToken);
-        Assert.True(result.Value.IsEmailVerified);
-        Assert.Equal(user.Username, result.Value.Username);
+        Assert.Equal("access-token", result.Value.Auth.AccessToken);
+        Assert.True(result.Value.Auth.IsEmailVerified);
+        Assert.Equal(user.Username, result.Value.Auth.Username);
 
         Assert.True(user.IsVerified);
         Assert.Equal(Now, token.ConsumedAt);

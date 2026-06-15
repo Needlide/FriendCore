@@ -10,10 +10,11 @@ internal sealed class LoginUserCommandHandler(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
     IJwtTokenService jwtTokenService,
+    IRefreshTokenService refreshTokenService,
     IDateTimeProvider dateTimeProvider)
-    : IRequestHandler<LoginUserCommand, ErrorOr<AuthResponse>>
+    : IRequestHandler<LoginUserCommand, ErrorOr<AuthTokens>>
 {
-    public async Task<ErrorOr<AuthResponse>> Handle(LoginUserCommand request, CancellationToken cancellationToken)
+    public async Task<ErrorOr<AuthTokens>> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var user = await userRepository.GetByEmailAsync(email, cancellationToken);
@@ -32,12 +33,15 @@ internal sealed class LoginUserCommandHandler(
         await userRepository.UpdateAsync(user, cancellationToken);
 
         var token = jwtTokenService.GenerateAccessToken(user);
-        return new AuthResponse(
+        var refresh = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
+
+        var auth = new AuthResponse(
             token.AccessToken,
             token.ExpiresAt,
             user.Id.ToString(),
             user.Username,
             user.DisplayName,
             user.IsVerified);
+        return new AuthTokens(auth, refresh.Token, refresh.ExpiresAt);
     }
 }

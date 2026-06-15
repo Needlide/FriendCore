@@ -28,6 +28,7 @@ public class AppDbContext(
     public DbSet<User> Users => Set<User>();
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<Block> Blocks => Set<Block>();

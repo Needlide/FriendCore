@@ -11,10 +11,11 @@ internal sealed class VerifyEmailCommandHandler(
     IUserRepository userRepository,
     IEmailVerificationTokenHasher tokenHasher,
     IJwtTokenService jwtTokenService,
+    IRefreshTokenService refreshTokenService,
     IDateTimeProvider dateTimeProvider)
-    : IRequestHandler<VerifyEmailCommand, ErrorOr<AuthResponse>>
+    : IRequestHandler<VerifyEmailCommand, ErrorOr<AuthTokens>>
 {
-    public async Task<ErrorOr<AuthResponse>> Handle(VerifyEmailCommand request, CancellationToken cancellationToken)
+    public async Task<ErrorOr<AuthTokens>> Handle(VerifyEmailCommand request, CancellationToken cancellationToken)
     {
         var now = dateTimeProvider.UtcNow;
         var tokenHash = tokenHasher.Hash(request.Token.Trim());
@@ -39,12 +40,15 @@ internal sealed class VerifyEmailCommandHandler(
         await userRepository.UpdateAsync(user, cancellationToken);
 
         var accessToken = jwtTokenService.GenerateAccessToken(user);
-        return new AuthResponse(
+        var refresh = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
+
+        var auth = new AuthResponse(
             accessToken.AccessToken,
             accessToken.ExpiresAt,
             user.Id.ToString(),
             user.Username,
             user.DisplayName,
             user.IsVerified);
+        return new AuthTokens(auth, refresh.Token, refresh.ExpiresAt);
     }
 }

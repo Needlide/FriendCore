@@ -13,6 +13,7 @@ public class RegisterUserCommandHandlerTests
     private readonly IUserRepository _repository = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
     private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
+    private readonly IRefreshTokenService _refreshTokenService = Substitute.For<IRefreshTokenService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private SeedingOptions _seeding = new();
 
@@ -21,11 +22,14 @@ public class RegisterUserCommandHandlerTests
         _passwordHasher.Hash(Arg.Any<string>()).Returns("hashed");
         _jwtTokenService.GenerateAccessToken(Arg.Any<User>())
             .Returns(new AuthTokenResult("token", new DateTimeOffset(2026, 6, 16, 9, 0, 0, TimeSpan.Zero)));
+        _refreshTokenService.IssueAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
+            .Returns(new IssuedRefreshToken("refresh", new DateTimeOffset(2026, 8, 16, 9, 0, 0, TimeSpan.Zero)));
         _dateTimeProvider.UtcNow.Returns(new DateTimeOffset(2026, 6, 16, 9, 0, 0, TimeSpan.Zero));
     }
 
     private RegisterUserCommandHandler CreateHandler() =>
-        new(_repository, _passwordHasher, _jwtTokenService, Options.Create(_seeding), _dateTimeProvider);
+        new(_repository, _passwordHasher, _jwtTokenService, _refreshTokenService, Options.Create(_seeding),
+            _dateTimeProvider);
 
     [Fact]
     public async Task Handle_ReturnsConflict_WhenEmailAlreadyExists()

@@ -12,11 +12,12 @@ internal sealed class RegisterUserCommandHandler(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
     IJwtTokenService jwtTokenService,
+    IRefreshTokenService refreshTokenService,
     IOptions<SeedingOptions> seedingOptions,
     IDateTimeProvider dateTimeProvider)
-    : IRequestHandler<RegisterUserCommand, ErrorOr<AuthResponse>>
+    : IRequestHandler<RegisterUserCommand, ErrorOr<AuthTokens>>
 {
-    public async Task<ErrorOr<AuthResponse>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
+    public async Task<ErrorOr<AuthTokens>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var slug = User.ToUsernameSlug(request.Username);
@@ -53,12 +54,15 @@ internal sealed class RegisterUserCommandHandler(
         await userRepository.AddAsync(user, preferences, cancellationToken);
 
         var token = jwtTokenService.GenerateAccessToken(user);
-        return new AuthResponse(
+        var refresh = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
+
+        var auth = new AuthResponse(
             token.AccessToken,
             token.ExpiresAt,
             user.Id.ToString(),
             user.Username,
             user.DisplayName,
             user.IsVerified);
+        return new AuthTokens(auth, refresh.Token, refresh.ExpiresAt);
     }
 }

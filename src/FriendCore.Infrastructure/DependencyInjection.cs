@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IFollowRepository, FollowRepository>();
         services.AddScoped<IBlockRepository, BlockRepository>();
@@ -71,6 +72,7 @@ public static class DependencyInjection
         services.AddHttpClient<IEmailService, ResendEmailService>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddSingleton<AuditInterceptor>();
         services.AddSingleton<SoftDeleteInterceptor>();

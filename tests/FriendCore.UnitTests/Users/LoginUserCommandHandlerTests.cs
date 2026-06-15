@@ -11,6 +11,7 @@ public class LoginUserCommandHandlerTests
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
+    private readonly IRefreshTokenService _refreshTokenService = Substitute.For<IRefreshTokenService>();
 
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
 
@@ -19,11 +20,14 @@ public class LoginUserCommandHandlerTests
         _dateTimeProvider.UtcNow.Returns(Now);
         _jwtTokenService.GenerateAccessToken(Arg.Any<User>())
             .Returns(new AuthTokenResult("access-token", Now.AddHours(1)));
+        _refreshTokenService.IssueAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
+            .Returns(new IssuedRefreshToken("refresh-token", Now.AddDays(60)));
     }
 
     private LoginUserCommandHandler CreateHandler()
     {
-        return new LoginUserCommandHandler(_userRepository, _passwordHasher, _jwtTokenService, _dateTimeProvider);
+        return new LoginUserCommandHandler(
+            _userRepository, _passwordHasher, _jwtTokenService, _refreshTokenService, _dateTimeProvider);
     }
 
     [Fact]
@@ -90,10 +94,11 @@ public class LoginUserCommandHandlerTests
         var result = await CreateHandler().Handle(new LoginUserCommand(user.Email, "correct"), CancellationToken.None);
 
         Assert.False(result.IsError);
-        Assert.Equal("access-token", result.Value.AccessToken);
-        Assert.Equal(user.Id.ToString(), result.Value.UserId);
-        Assert.Equal(user.Username, result.Value.Username);
-        Assert.Equal(user.DisplayName, result.Value.DisplayName);
+        Assert.Equal("access-token", result.Value.Auth.AccessToken);
+        Assert.Equal("refresh-token", result.Value.RefreshToken);
+        Assert.Equal(user.Id.ToString(), result.Value.Auth.UserId);
+        Assert.Equal(user.Username, result.Value.Auth.Username);
+        Assert.Equal(user.DisplayName, result.Value.Auth.DisplayName);
         Assert.Equal(Now, user.LastActiveAt);
         await _userRepository.Received(1).UpdateAsync(user, Arg.Any<CancellationToken>());
     }

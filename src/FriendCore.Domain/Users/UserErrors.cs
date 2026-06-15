@@ -61,4 +61,7 @@ public static class UserErrors
 
     public static Error InvalidVerificationToken =>
         Error.Validation("User.InvalidVerificationToken", "Verification link is invalid or has expired.");
+
+    public static Error InvalidRefreshToken =>
+        Error.Unauthorized("User.InvalidRefreshToken", "The session is invalid or has expired. Please sign in again.");
 }

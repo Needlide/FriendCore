@@ -8,4 +8,4 @@ public sealed record RegisterUserCommand(
     string Username,
     string DisplayName,
     string Email,
-    string Password) : IRequest<ErrorOr<AuthResponse>>;
+    string Password) : IRequest<ErrorOr<AuthTokens>>;

@@ -4,4 +4,4 @@ using MediatR;
 
 namespace FriendCore.Application.Users.Commands.VerifyEmail;
 
-public sealed record VerifyEmailCommand(string Token) : IRequest<ErrorOr<AuthResponse>>;
+public sealed record VerifyEmailCommand(string Token) : IRequest<ErrorOr<AuthTokens>>;
