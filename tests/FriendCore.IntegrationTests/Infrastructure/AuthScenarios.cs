@@ -115,15 +115,12 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
         return ids;
     }
 
-    // No domain ban API exists yet; the IsBanned setter is private. Flip it via
-    // reflection then persist so the AccountBanned path stays covered. Replace
-    // with a real User.Ban(...) call once the moderation phase adds one.
     public async Task BanUser(string email)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var user = await db.Users.SingleAsync(u => u.Email == email);
-        typeof(User).GetProperty(nameof(User.IsBanned))!.SetValue(user, true);
+        user.Ban(factory.Clock.UtcNow);
         await db.SaveChangesAsync();
     }
 

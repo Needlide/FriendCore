@@ -1,8 +1,10 @@
+using System.Net;
 using System.Threading.RateLimiting;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Infrastructure.Caching;
 using FriendCore.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
@@ -107,6 +109,11 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
             services.RemoveAll<IDateTimeProvider>();
             services.AddSingleton<IDateTimeProvider>(Clock);
 
+            // The in-memory TestServer leaves Connection.RemoteIpAddress null (real Kestrel always
+            // sets it), so populate a loopback IP like a real server would — lets tests verify the
+            // request-IP wiring (e.g. the §10.3 moderation audit log).
+            services.AddSingleton<IStartupFilter, RemoteIpStartupFilter>();
+
             // No Redis in the test environment: use the no-op cache so cached paths
             // (e.g. tag autocomplete) fall through to the database.
             services.RemoveAll<ICacheService>();
@@ -122,5 +129,21 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
                 options.AddPolicy(RateLimitingExtensions.ApiPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
             });
         });
+    }
+
+    // Stamps a loopback remote IP on every request, standing in for what Kestrel provides in
+    // production (the in-memory TestServer otherwise leaves it null).
+    private sealed class RemoteIpStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+            app =>
+            {
+                app.Use(async (context, nextMiddleware) =>
+                {
+                    context.Connection.RemoteIpAddress ??= IPAddress.Loopback;
+                    await nextMiddleware();
+                });
+                next(app);
+            };
     }
 }

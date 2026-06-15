@@ -182,6 +182,21 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task ModerationAction_RecordsRequestIpInAuditLog()
+    {
+        // §10.3: the audit entry captures the moderator's request IP. Verifies the real
+        // HttpCurrentUserService.IpAddress wiring flows through to the persisted log.
+        var (_, targetName, _) = await RegisterUser();
+        var moderator = await ModeratorClient();
+        await moderator.PostAsJsonAsync(
+            $"/api/v1/admin/users/{targetName}/action", new { action = "Warning", reason = "ip-capture check" });
+
+        var log = await moderator.GetFromJsonAsync<AuditLogResponse>("/api/v1/admin/audit-log");
+        var entry = log!.Entries.First(e => e.Reason == "ip-capture check");
+        Assert.False(string.IsNullOrWhiteSpace(entry.IpAddress));
+    }
+
+    [Fact]
     public async Task AdminEndpoints_RequireAuth()
     {
         var anon = factory.CreateClient();
