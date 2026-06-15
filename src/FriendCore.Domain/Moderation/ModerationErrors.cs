@@ -21,4 +21,7 @@ public static class ModerationErrors
 
     public static Error TargetNotFound =>
         Error.NotFound("Moderation.TargetNotFound", "The action target was not found.");
+
+    public static Error CannotChangeOwnRole =>
+        Error.Validation("Moderation.CannotChangeOwnRole", "You cannot change your own role.");
 }

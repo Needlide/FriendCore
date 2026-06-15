@@ -2,6 +2,7 @@ using FriendCore.API.Authorization;
 using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Moderation.Commands.ActOnUser;
+using FriendCore.Application.Moderation.Commands.ChangeUserRole;
 using FriendCore.Application.Moderation.Queries.GetUserAccount;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -42,6 +43,25 @@ public sealed class AdminUsersController(ISender sender) : ControllerBase
         var result = await sender.Send(
             new ActOnUserCommand(username, request.Action, request.Reason, request.SuspensionDays),
             cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    // Role management is the highest-privilege admin action — Admin only (stricter than the
+    // controller's Moderator default; both policies must pass).
+    [HttpPost("{username}/role")]
+    [Authorize(Policy = AuthorizationPolicies.Admin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ChangeRole(
+        string username,
+        [FromBody] ChangeUserRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ChangeUserRoleCommand(username, request.Role, request.Reason), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 }

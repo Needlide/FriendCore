@@ -75,9 +75,10 @@ public sealed class Appeal : AggregateRoot<Ulid>
         return Result.Success;
     }
 
-    // Dismissals aren't actions against a user, so there's nothing to appeal.
+    // Dismissals and role changes aren't enforcement actions against a user, so there's nothing
+    // to appeal through the moderation appeals flow.
     public static bool IsAppealable(ModerationActionType action) =>
-        action != ModerationActionType.ReportDismissed;
+        action is not (ModerationActionType.ReportDismissed or ModerationActionType.RoleChanged);
 
     public static DateTimeOffset DeadlineFor(ModerationActionType action, DateTimeOffset createdAt) =>
         createdAt.AddDays(action switch
