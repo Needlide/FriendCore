@@ -1,6 +1,8 @@
+using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Contracts.Posts;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Common.Models;
+using FriendCore.Application.Moderation.Commands.ReportPost;
 using FriendCore.Application.Posts.Commands.AddComment;
 using FriendCore.Application.Posts.Commands.CreatePost;
 using FriendCore.Application.Posts.Commands.DeleteComment;
@@ -46,6 +48,25 @@ public sealed class PostsController(ISender sender) : ControllerBase
 
         var result = await sender.Send(new GetPostQuery(postId), cancellationToken);
         return result.ToActionResult();
+    }
+
+    [HttpPost("{id}/report")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Report(
+        string id,
+        [FromBody] ReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var postId))
+            return NotFound();
+
+        var result = await sender.Send(
+            new ReportPostCommand(postId, request.Category, request.Note), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
     [HttpDelete("{id}")]

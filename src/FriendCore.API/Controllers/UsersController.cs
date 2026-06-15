@@ -2,6 +2,8 @@ using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Contracts.Users;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
+using FriendCore.API.Contracts.Moderation;
+using FriendCore.Application.Moderation.Commands.ReportUser;
 using FriendCore.Application.Users.Commands.BlockUser;
 using FriendCore.Application.Users.Commands.FollowUser;
 using FriendCore.Application.Users.Commands.MuteUser;
@@ -190,6 +192,22 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<IActionResult> Unmute(string username, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new UnmuteUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPost("{username}/report")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Report(
+        string username,
+        [FromBody] ReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ReportUserCommand(username, request.Category, request.Note), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 

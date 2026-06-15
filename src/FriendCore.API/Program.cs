@@ -107,6 +107,12 @@ try
 
         options.AddPolicy(AuthorizationPolicies.Admin, policy =>
             policy.RequireRole(nameof(UserRole.Admin)));
+
+        options.AddPolicy(AuthorizationPolicies.Moderation, policy =>
+            policy.RequireRole(
+                nameof(UserRole.Moderator),
+                nameof(UserRole.SeniorModerator),
+                nameof(UserRole.Admin)));
     });
 
     var app = builder.Build();

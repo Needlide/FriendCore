@@ -12,6 +12,12 @@ public interface IUserRepository
     // block management itself (block/unblock must reach the counterpart across the block).
     Task<User?> GetByUsernameSlugIgnoringBlocksAsync(string usernameSlug, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids, CancellationToken cancellationToken = default);
+
+    // Like GetByIdsAsync but ignores the block filter — moderation views must show every user
+    // regardless of the acting moderator's own block relationships.
+    Task<IReadOnlyList<User>> GetByIdsIgnoringBlocksAsync(
+        IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(Ulid tagId, CancellationToken cancellationToken = default);
     Task<UserPreferences?> GetPreferencesAsync(Ulid userId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default);

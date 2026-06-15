@@ -52,6 +52,21 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         return await context.Users.Where(user => ids.Contains(user.Id)).AsNoTracking().ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetByIdsIgnoringBlocksAsync(
+        IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+
+        // Skips only the block filter — soft-delete still applies.
+        return await context.Users
+            .IgnoreQueryFilters([AppDbContext.BlocksFilter])
+            .Where(user => ids.Contains(user.Id))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(
         Ulid tagId,
         CancellationToken cancellationToken = default)
