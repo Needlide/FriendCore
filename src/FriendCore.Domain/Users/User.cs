@@ -183,6 +183,14 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         UpdatedAt = at;
     }
 
+    // Reverses ban and suspension — used when an appeal is overturned (§13.3).
+    public void Reinstate(DateTimeOffset at)
+    {
+        IsBanned = false;
+        SuspendedUntil = null;
+        UpdatedAt = at;
+    }
+
     public static string ToUsernameSlug(string username)
     {
         return username.Trim().ToLowerInvariant();

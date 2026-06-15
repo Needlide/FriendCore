@@ -216,6 +216,65 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("admin_audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Moderation.Appeal", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppellantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("appellant_id");
+
+                    b.Property<string>("AuditLogId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("audit_log_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("Deadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deadline");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("review_note");
+
+                    b.Property<string>("ReviewedByModeratorId")
+                        .HasColumnType("text")
+                        .HasColumnName("reviewed_by_moderator_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditLogId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "Deadline");
+
+                    b.ToTable("appeals", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Moderation.Report", b =>
                 {
                     b.Property<string>("Id")

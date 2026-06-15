@@ -14,6 +14,13 @@ public sealed class AdminAuditLogRepository(AppDbContext context) : IAdminAuditL
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<AdminAuditLog?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default)
+    {
+        return context.AdminAuditLog
+            .AsNoTracking()
+            .FirstOrDefaultAsync(entry => entry.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AdminAuditLog>> GetRecentAsync(
         int limit,
         CancellationToken cancellationToken = default)

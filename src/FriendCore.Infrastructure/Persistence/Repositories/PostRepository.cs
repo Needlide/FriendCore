@@ -29,6 +29,12 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
         context.Posts.Remove(post);
     }
 
+    public void StageRestore(Post post)
+    {
+        // Clearing DeletedAt revives a soft-deleted post; no save here — the appeal review commits it.
+        post.DeletedAt = null;
+    }
+
     public async Task<IReadOnlyList<Post>> GetByIdsAsync(
         IReadOnlyCollection<Ulid> ids,
         CancellationToken cancellationToken = default)

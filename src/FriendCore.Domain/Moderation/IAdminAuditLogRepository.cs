@@ -7,6 +7,8 @@ public interface IAdminAuditLogRepository
     // the same unit of work, so the action and its log entry land atomically.
     Task AddAndSaveAsync(AdminAuditLog entry, CancellationToken cancellationToken = default);
 
+    Task<AdminAuditLog?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AdminAuditLog>> GetRecentAsync(int limit, CancellationToken cancellationToken = default);
 
     // Moderation history for one user (entries whose target is that user), newest first.

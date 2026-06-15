@@ -12,6 +12,9 @@ public interface IPostRepository
     // transaction as the moderation audit entry.
     void StageSoftDelete(Post post);
 
+    // Reverses a soft-delete (clears DeletedAt) WITHOUT saving — for an overturned appeal.
+    void StageRestore(Post post);
+
     // Order is not guaranteed; callers re-order. Soft-deleted and block-filtered posts drop out.
     Task<IReadOnlyList<Post>> GetByIdsAsync(
         IReadOnlyCollection<Ulid> ids,
