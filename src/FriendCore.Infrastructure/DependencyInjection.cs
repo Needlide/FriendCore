@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IMessagingRepository, MessagingRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<IAdminAuditLogRepository, AdminAuditLogRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddHostedService<TagMaintenanceService>();

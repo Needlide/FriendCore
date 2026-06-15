@@ -16,6 +16,9 @@ public static class UserErrors
     public static Error AccountBanned =>
         Error.Forbidden("User.AccountBanned", "This account has been suspended.");
 
+    public static Error AccountSuspended =>
+        Error.Forbidden("User.AccountSuspended", "This account is temporarily suspended.");
+
     public static Error InvalidUsername =>
         Error.Validation("User.InvalidUsername",
             "Username must be 3–30 characters and contain only letters, numbers, or underscores.");

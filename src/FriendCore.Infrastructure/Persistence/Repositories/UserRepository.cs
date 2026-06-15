@@ -67,6 +67,14 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
             .ToListAsync(cancellationToken);
     }
 
+    public Task<User?> GetByIdIgnoringBlocksAsync(Ulid id, CancellationToken cancellationToken = default)
+    {
+        // Tracked (no AsNoTracking) so moderation enforcement can mutate the loaded user.
+        return context.Users
+            .IgnoreQueryFilters([AppDbContext.BlocksFilter])
+            .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(
         Ulid tagId,
         CancellationToken cancellationToken = default)

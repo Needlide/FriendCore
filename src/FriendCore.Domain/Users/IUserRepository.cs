@@ -18,6 +18,9 @@ public interface IUserRepository
     Task<IReadOnlyList<User>> GetByIdsIgnoringBlocksAsync(
         IReadOnlyCollection<Ulid> ids,
         CancellationToken cancellationToken = default);
+
+    // Tracked, block-ignoring single load for moderation enforcement (suspend/ban mutate it).
+    Task<User?> GetByIdIgnoringBlocksAsync(Ulid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(Ulid tagId, CancellationToken cancellationToken = default);
     Task<UserPreferences?> GetPreferencesAsync(Ulid userId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default);

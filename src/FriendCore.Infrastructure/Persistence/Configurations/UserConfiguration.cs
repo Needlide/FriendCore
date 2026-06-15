@@ -69,6 +69,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.IsBanned)
             .HasColumnName("is_banned");
 
+        builder.Property(user => user.SuspendedUntil)
+            .HasColumnName("suspended_until");
+
         builder.Property(user => user.CreatedAt)
             .HasColumnName("created_at");
 

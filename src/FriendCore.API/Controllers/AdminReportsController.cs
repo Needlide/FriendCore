@@ -1,5 +1,7 @@
 using FriendCore.API.Authorization;
+using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Extensions;
+using FriendCore.Application.Moderation.Commands.ResolveReport;
 using FriendCore.Application.Moderation.Queries.GetReport;
 using FriendCore.Application.Moderation.Queries.GetReportQueue;
 using MediatR;
@@ -41,5 +43,26 @@ public sealed class AdminReportsController(ISender sender) : ControllerBase
 
         var result = await sender.Send(new GetReportQuery(reportId), cancellationToken);
         return result.ToActionResult();
+    }
+
+    [HttpPost("{id}/resolve")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Resolve(
+        string id,
+        [FromBody] ResolveReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var reportId))
+            return NotFound();
+
+        var result = await sender.Send(
+            new ResolveReportCommand(reportId, request.Action, request.Reason, request.SuspensionDays),
+            cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 }

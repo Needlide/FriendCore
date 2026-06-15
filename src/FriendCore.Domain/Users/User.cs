@@ -31,6 +31,7 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public UserRole Role { get; private set; }
     public bool IsVerified { get; private set; }
     public bool IsBanned { get; private set; }
+    public DateTimeOffset? SuspendedUntil { get; private set; }
     public DateTimeOffset? LastActiveAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
@@ -163,6 +164,23 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public void AssignRole(UserRole role)
     {
         Role = role;
+    }
+
+    // §13.2 enforcement. Suspension blocks login until the given time; ban is permanent. Login
+    // is the enforcement point (LoginUser checks both) — existing short-lived tokens are not
+    // revoked mid-session in the MVP.
+    public bool IsSuspended(DateTimeOffset now) => SuspendedUntil is { } until && until > now;
+
+    public void Suspend(DateTimeOffset until, DateTimeOffset at)
+    {
+        SuspendedUntil = until;
+        UpdatedAt = at;
+    }
+
+    public void Ban(DateTimeOffset at)
+    {
+        IsBanned = true;
+        UpdatedAt = at;
     }
 
     public static string ToUsernameSlug(string username)

@@ -41,6 +41,7 @@ public class AppDbContext(
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<AdminAuditLog> AdminAuditLog => Set<AdminAuditLog>();
 
     // Referenced inside the block filters. The model (and the filter expressions in it) is built
     // ONCE and cached for the lifetime of the app; EF rewrites accesses to this property so each

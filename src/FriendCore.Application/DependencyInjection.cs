@@ -1,5 +1,6 @@
 using FluentValidation;
 using FriendCore.Application.Common.Behaviors;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Application.Notifications.Services;
 using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Tags.Services;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<PostMediaResponseFactory>();
         services.AddScoped<PostResponseAssembler>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IModerationService, ModerationService>();
 
         return services;
     }

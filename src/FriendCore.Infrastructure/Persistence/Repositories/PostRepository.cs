@@ -13,6 +13,22 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
     }
 
+    public Task<Post?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default)
+    {
+        // Tracked + ignores all query filters (block and soft-delete) so moderation can reach
+        // any reported post.
+        return context.Posts
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
+    }
+
+    public void StageSoftDelete(Post post)
+    {
+        // The SoftDeleteInterceptor converts this Remove into a DeletedAt stamp at SaveChanges
+        // time; no save here — the moderation audit write commits it.
+        context.Posts.Remove(post);
+    }
+
     public async Task<IReadOnlyList<Post>> GetByIdsAsync(
         IReadOnlyCollection<Ulid> ids,
         CancellationToken cancellationToken = default)

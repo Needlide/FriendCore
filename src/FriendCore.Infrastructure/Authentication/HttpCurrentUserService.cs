@@ -22,4 +22,7 @@ public sealed class HttpCurrentUserService(IHttpContextAccessor httpContextAcces
 
     public bool IsAuthenticated =>
         httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+
+    public string? IpAddress =>
+        httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 }

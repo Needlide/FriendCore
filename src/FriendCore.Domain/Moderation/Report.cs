@@ -50,6 +50,28 @@ public sealed class Report : AggregateRoot<Ulid>
         };
     }
 
+    public ErrorOr<Success> Resolve(Ulid moderatorId, DateTimeOffset at)
+    {
+        if (Status != ReportStatus.Pending)
+            return ReportErrors.AlreadyResolved;
+
+        Status = ReportStatus.Resolved;
+        ResolvedByModeratorId = moderatorId;
+        ResolvedAt = at;
+        return Result.Success;
+    }
+
+    public ErrorOr<Success> Dismiss(Ulid moderatorId, DateTimeOffset at)
+    {
+        if (Status != ReportStatus.Pending)
+            return ReportErrors.AlreadyResolved;
+
+        Status = ReportStatus.Dismissed;
+        ResolvedByModeratorId = moderatorId;
+        ResolvedAt = at;
+        return Result.Success;
+    }
+
     // §13.5 priority is derived from the category, not chosen by the reporter.
     public static ReportPriority PriorityFor(ReportCategory category) =>
         category switch

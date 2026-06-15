@@ -24,6 +24,10 @@ internal sealed class LoginUserCommandHandler(
         if (user.IsBanned)
             return UserErrors.AccountBanned;
 
+        // §13.2: a temporary suspension blocks login until it expires.
+        if (user.IsSuspended(dateTimeProvider.UtcNow))
+            return UserErrors.AccountSuspended;
+
         user.RecordLogin(dateTimeProvider.UtcNow);
         await userRepository.UpdateAsync(user, cancellationToken);
 

@@ -13,4 +13,7 @@ public static class ReportErrors
     public static Error NoteTooLong =>
         Error.Validation("Report.NoteTooLong",
             $"Report note must not exceed {Report.MaxNoteLength} characters.");
+
+    public static Error AlreadyResolved =>
+        Error.Conflict("Report.AlreadyResolved", "This report has already been resolved.");
 }

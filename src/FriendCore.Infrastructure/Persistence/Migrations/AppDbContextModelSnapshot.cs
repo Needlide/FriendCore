@@ -160,6 +160,62 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("messages", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Moderation.AdminAuditLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<string>("ModeratorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("moderator_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RelatedReportId")
+                        .HasColumnType("text")
+                        .HasColumnName("related_report_id");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("target_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("TargetType", "TargetId", "CreatedAt");
+
+                    b.ToTable("admin_audit_log", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Moderation.Report", b =>
                 {
                     b.Property<string>("Id")
@@ -643,6 +699,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("role");
+
+                    b.Property<DateTimeOffset?>("SuspendedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("suspended_until");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")

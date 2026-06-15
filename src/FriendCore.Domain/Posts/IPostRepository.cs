@@ -4,6 +4,14 @@ public interface IPostRepository
 {
     Task<Post?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
 
+    // Tracked, ignores block AND soft-delete filters — moderation must reach any reported post
+    // (incl. one its author already deleted, to act on the author).
+    Task<Post?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default);
+
+    // Stages a soft-delete on the tracked post WITHOUT saving, so it can commit in the same
+    // transaction as the moderation audit entry.
+    void StageSoftDelete(Post post);
+
     // Order is not guaranteed; callers re-order. Soft-deleted and block-filtered posts drop out.
     Task<IReadOnlyList<Post>> GetByIdsAsync(
         IReadOnlyCollection<Ulid> ids,
