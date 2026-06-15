@@ -1,3 +1,5 @@
+using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Notifications;
 using FriendCore.Domain.Users;
 using Microsoft.Extensions.Logging;
@@ -7,6 +9,7 @@ namespace FriendCore.Application.Notifications.Services;
 internal sealed class NotificationService(
     INotificationRepository notificationRepository,
     IBlockRepository blockRepository,
+    IRealtimeNotifier realtimeNotifier,
     ILogger<NotificationService> logger)
     : INotificationService
 {
@@ -30,6 +33,13 @@ internal sealed class NotificationService(
 
             var notification = Notification.Create(recipientId, actorId, type, entityId, occurredAt);
             await notificationRepository.AddAsync(notification, cancellationToken);
+
+            // Live bell push (§11.1). Best-effort: inside the same try, so a push failure is
+            // logged and swallowed just like a persistence failure.
+            await realtimeNotifier.NotificationReceivedAsync(
+                recipientId,
+                new RealtimeNotification(type.ToString(), actorId.ToString(), entityId.ToString(), occurredAt),
+                cancellationToken);
         }
         catch (Exception ex)
         {

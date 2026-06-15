@@ -13,6 +13,7 @@ internal sealed class SendMessageCommandHandler(
     ICurrentUserService currentUserService,
     IMessagingRepository messagingRepository,
     IBlockRepository blockRepository,
+    IRealtimeNotifier realtimeNotifier,
     IPublisher publisher,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<SendMessageCommand, ErrorOr<MessageResponse>>
@@ -41,10 +42,17 @@ internal sealed class SendMessageCommandHandler(
         conversation.RecordMessage(now);
         await messagingRepository.AddMessageAsync(message, cancellationToken);
 
+        var response = MessageResponse.Create(message);
+
         if (conversation.OtherParticipantId(userId) is { } recipientId)
+        {
+            // Bell notification (NewMessage) via the event; live message delivery via the
+            // notifier so an open conversation appends it without a refetch (§11.1).
             await publisher.Publish(
                 new MessageSentEvent(recipientId, userId, conversation.Id, now), cancellationToken);
+            await realtimeNotifier.MessageReceivedAsync(recipientId, response, cancellationToken);
+        }
 
-        return MessageResponse.Create(message);
+        return response;
     }
 }

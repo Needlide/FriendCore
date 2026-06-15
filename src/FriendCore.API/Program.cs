@@ -2,12 +2,15 @@ using System.Text;
 using System.Text.Json.Serialization;
 using FriendCore.API.Authorization;
 using FriendCore.API.Extensions;
+using FriendCore.API.Realtime;
+using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Users;
 using FriendCore.Application;
 using FriendCore.Infrastructure;
 using FriendCore.Infrastructure.Authentication;
 using FriendCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -52,6 +55,12 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    builder.Services.AddSignalR();
+    // Maps connections → users so Clients.User(id) can target every device a user has open.
+    builder.Services.AddSingleton<IUserIdProvider, UlidUserIdProvider>();
+    // The push abstraction the application depends on; SignalR is the API-layer implementation.
+    builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
@@ -66,6 +75,22 @@ try
                 ValidAudience = jwtOptions.Audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
                 ClockSkew = TimeSpan.FromMinutes(1)
+            };
+
+            // WebSocket handshakes can't carry an Authorization header from a browser, so the
+            // SignalR client sends the JWT as ?access_token=... . Lift it into the auth pipeline
+            // for hub paths only (everything else keeps using the header).
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) &&
+                        context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        context.Token = accessToken;
+
+                    return Task.CompletedTask;
+                }
             };
         });
 
@@ -111,6 +136,10 @@ try
 
     app.MapHealthChecks("/health");
     app.MapControllers().RequireRateLimiting(RateLimitingExtensions.ApiPolicy);
+
+    // Hubs require auth (the [Authorize] on each), reached via the access_token query string.
+    app.MapHub<NotificationHub>("/hubs/notifications");
+    app.MapHub<MessagingHub>("/hubs/messaging");
 
     app.MapGet("/", () => Results.Ok(new { name = "FriendCore API", status = "running" }));
 

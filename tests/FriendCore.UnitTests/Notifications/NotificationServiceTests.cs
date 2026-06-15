@@ -1,3 +1,5 @@
+using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Models;
 using FriendCore.Application.Notifications.Services;
 using FriendCore.Domain.Notifications;
 using FriendCore.Domain.Users;
@@ -12,11 +14,12 @@ public class NotificationServiceTests
 
     private readonly INotificationRepository _notificationRepository = Substitute.For<INotificationRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
+    private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
     private readonly Ulid _recipient = Ulid.NewUlid();
     private readonly Ulid _actor = Ulid.NewUlid();
 
     private NotificationService CreateService() =>
-        new(_notificationRepository, _blockRepository, NullLogger<NotificationService>.Instance);
+        new(_notificationRepository, _blockRepository, _realtimeNotifier, NullLogger<NotificationService>.Instance);
 
     [Fact]
     public async Task CreateAsync_Persists_WhenAllowed()
@@ -31,6 +34,10 @@ public class NotificationServiceTests
                 && n.Type == NotificationType.NewFollower
                 && n.EntityId == _actor
                 && !n.IsRead),
+            Arg.Any<CancellationToken>());
+        await _realtimeNotifier.Received(1).NotificationReceivedAsync(
+            _recipient,
+            Arg.Is<RealtimeNotification>(payload => payload.Type == "NewFollower"),
             Arg.Any<CancellationToken>());
     }
 

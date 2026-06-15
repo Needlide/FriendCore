@@ -1,4 +1,5 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common.Models;
 using FriendCore.Application.Messaging.Commands.SendMessage;
 using FriendCore.Application.Messaging.Commands.StartConversation;
 using FriendCore.Application.Notifications.Events;
@@ -18,6 +19,7 @@ public class MessagingHandlerTests
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
+    private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
     private readonly IPublisher _publisher = Substitute.For<IPublisher>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _userId = Ulid.NewUlid();
@@ -34,7 +36,8 @@ public class MessagingHandlerTests
         new(_currentUserService, _userRepository, _blockRepository, _messagingRepository, _dateTimeProvider);
 
     private SendMessageCommandHandler SendHandler() =>
-        new(_currentUserService, _messagingRepository, _blockRepository, _publisher, _dateTimeProvider);
+        new(_currentUserService, _messagingRepository, _blockRepository, _realtimeNotifier, _publisher,
+            _dateTimeProvider);
 
     [Fact]
     public async Task Start_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -159,5 +162,7 @@ public class MessagingHandlerTests
         await _publisher.Received(1).Publish(
             Arg.Is<MessageSentEvent>(e => e.RecipientId == _recipient.Id && e.SenderId == _userId),
             Arg.Any<CancellationToken>());
+        await _realtimeNotifier.Received(1).MessageReceivedAsync(
+            _recipient.Id, Arg.Is<MessageResponse>(m => m.Content == "hello"), Arg.Any<CancellationToken>());
     }
 }
