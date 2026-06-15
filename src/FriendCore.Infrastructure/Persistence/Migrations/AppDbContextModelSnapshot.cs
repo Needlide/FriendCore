@@ -160,6 +160,52 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("messages", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_id");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("RecipientId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientId")
+                        .HasDatabaseName("ix_notifications_recipient_unread")
+                        .HasFilter("is_read = false");
+
+                    b.HasIndex("RecipientId", "CreatedAt", "Id");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Posts.Comment", b =>
                 {
                     b.Property<string>("Id")

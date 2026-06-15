@@ -5,6 +5,7 @@ using FriendCore.Application.Common.Options;
 using FriendCore.Domain.Discovery;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
+using FriendCore.Domain.Notifications;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
@@ -48,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IMuteRepository, MuteRepository>();
         services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
         services.AddScoped<IMessagingRepository, MessagingRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddHostedService<TagMaintenanceService>();

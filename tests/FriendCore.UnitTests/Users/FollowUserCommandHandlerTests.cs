@@ -1,6 +1,8 @@
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Notifications.Events;
 using FriendCore.Application.Users.Commands.FollowUser;
 using FriendCore.Domain.Users;
+using MediatR;
 using NSubstitute;
 
 namespace FriendCore.UnitTests.Users;
@@ -13,6 +15,7 @@ public class FollowUserCommandHandlerTests
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IFollowRepository _followRepository = Substitute.For<IFollowRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
+    private readonly IPublisher _publisher = Substitute.For<IPublisher>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _currentUserId = Ulid.NewUlid();
     private readonly User _target = UserTestFactory.Create(username: "bob");
@@ -25,7 +28,7 @@ public class FollowUserCommandHandlerTests
     }
 
     private FollowUserCommandHandler CreateHandler() =>
-        new(_currentUserService, _userRepository, _followRepository, _blockRepository, _dateTimeProvider);
+        new(_currentUserService, _userRepository, _followRepository, _blockRepository, _publisher, _dateTimeProvider);
 
     [Fact]
     public async Task Handle_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -71,6 +74,9 @@ public class FollowUserCommandHandlerTests
         await _followRepository.Received(1).AddAsync(
             Arg.Is<Follow>(f => f.FollowerId == _currentUserId && f.FollowedId == _target.Id),
             Arg.Any<CancellationToken>());
+        await _publisher.Received(1).Publish(
+            Arg.Is<UserFollowedEvent>(e => e.FollowedId == _target.Id && e.FollowerId == _currentUserId),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -96,5 +102,7 @@ public class FollowUserCommandHandlerTests
 
         Assert.False(result.IsError);
         await _followRepository.DidNotReceive().AddAsync(Arg.Any<Follow>(), Arg.Any<CancellationToken>());
+        // No new follow ⇒ no notification.
+        await _publisher.DidNotReceiveWithAnyArgs().Publish(Arg.Any<UserFollowedEvent>(), Arg.Any<CancellationToken>());
     }
 }

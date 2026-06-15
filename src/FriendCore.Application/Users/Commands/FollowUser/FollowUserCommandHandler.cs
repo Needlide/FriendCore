@@ -1,5 +1,6 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Notifications.Events;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Users;
 using MediatR;
@@ -11,6 +12,7 @@ internal sealed class FollowUserCommandHandler(
     IUserRepository userRepository,
     IFollowRepository followRepository,
     IBlockRepository blockRepository,
+    IPublisher publisher,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<FollowUserCommand, ErrorOr<Success>>
 {
@@ -32,9 +34,13 @@ internal sealed class FollowUserCommandHandler(
         if (await blockRepository.ExistsBetweenAsync(userId, target.Id, cancellationToken))
             return UserErrors.NotFound;
 
-        // Idempotent: re-following is a no-op.
+        // Idempotent: re-following is a no-op — and must not re-fire a notification.
         if (!await followRepository.ExistsAsync(userId, target.Id, cancellationToken))
-            await followRepository.AddAsync(Follow.Create(userId, target.Id, dateTimeProvider.UtcNow), cancellationToken);
+        {
+            var now = dateTimeProvider.UtcNow;
+            await followRepository.AddAsync(Follow.Create(userId, target.Id, now), cancellationToken);
+            await publisher.Publish(new UserFollowedEvent(target.Id, userId, now), cancellationToken);
+        }
 
         return Result.Success;
     }

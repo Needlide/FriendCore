@@ -1,9 +1,11 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Messaging.Commands.SendMessage;
 using FriendCore.Application.Messaging.Commands.StartConversation;
+using FriendCore.Application.Notifications.Events;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
+using MediatR;
 using NSubstitute;
 
 namespace FriendCore.UnitTests.Messaging;
@@ -16,6 +18,7 @@ public class MessagingHandlerTests
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
+    private readonly IPublisher _publisher = Substitute.For<IPublisher>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _userId = Ulid.NewUlid();
     private readonly User _recipient = UserTestFactory.Create(username: "bob", email: "bob@example.com");
@@ -31,7 +34,7 @@ public class MessagingHandlerTests
         new(_currentUserService, _userRepository, _blockRepository, _messagingRepository, _dateTimeProvider);
 
     private SendMessageCommandHandler SendHandler() =>
-        new(_currentUserService, _messagingRepository, _blockRepository, _dateTimeProvider);
+        new(_currentUserService, _messagingRepository, _blockRepository, _publisher, _dateTimeProvider);
 
     [Fact]
     public async Task Start_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -152,6 +155,9 @@ public class MessagingHandlerTests
         Assert.Equal(Now, conversation.LastMessageAt);
         await _messagingRepository.Received(1).AddMessageAsync(
             Arg.Is<Message>(m => m.ConversationId == conversation.Id && m.SenderId == _userId),
+            Arg.Any<CancellationToken>());
+        await _publisher.Received(1).Publish(
+            Arg.Is<MessageSentEvent>(e => e.RecipientId == _recipient.Id && e.SenderId == _userId),
             Arg.Any<CancellationToken>());
     }
 }

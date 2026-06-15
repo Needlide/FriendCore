@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
+using FriendCore.Application.Notifications.Events;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -12,6 +13,7 @@ internal sealed class AddCommentCommandHandler(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
     IPostRepository postRepository,
+    IPublisher publisher,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<AddCommentCommand, ErrorOr<CommentResponse>>
 {
@@ -28,13 +30,15 @@ internal sealed class AddCommentCommandHandler(
         if (post is null)
             return PostErrors.NotFound;
 
-        var commentResult = Comment.Create(post.Id, userId, request.Content, dateTimeProvider.UtcNow);
+        var now = dateTimeProvider.UtcNow;
+        var commentResult = Comment.Create(post.Id, userId, request.Content, now);
         if (commentResult.IsError)
             return commentResult.Errors;
 
         var comment = commentResult.Value;
         post.IncrementCommentCount();
         await postRepository.AddCommentAsync(comment, cancellationToken);
+        await publisher.Publish(new PostCommentedEvent(post.AuthorId, userId, post.Id, now), cancellationToken);
 
         return CommentResponse.Create(comment, author);
     }

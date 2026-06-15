@@ -6,6 +6,7 @@ using FriendCore.Application.Posts.Commands.UnlikePost;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
 using FriendCore.UnitTests.Users;
+using MediatR;
 using NSubstitute;
 
 namespace FriendCore.UnitTests.Posts;
@@ -17,6 +18,7 @@ public class PostInteractionHandlerTests
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
+    private readonly IPublisher _publisher = Substitute.For<IPublisher>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly User _user = UserTestFactory.Create();
 
@@ -40,7 +42,7 @@ public class PostInteractionHandlerTests
         NewPost(out var post);
         _postRepository.LikeExistsAsync(post.Id, _user.Id, Arg.Any<CancellationToken>()).Returns(false);
 
-        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _dateTimeProvider);
+        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _publisher, _dateTimeProvider);
         var result = await handler.Handle(new LikePostCommand(post.Id), CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -58,7 +60,7 @@ public class PostInteractionHandlerTests
         NewPost(out var post);
         _postRepository.LikeExistsAsync(post.Id, _user.Id, Arg.Any<CancellationToken>()).Returns(true);
 
-        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _dateTimeProvider);
+        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _publisher, _dateTimeProvider);
         var result = await handler.Handle(new LikePostCommand(post.Id), CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -90,7 +92,7 @@ public class PostInteractionHandlerTests
     {
         _postRepository.GetByIdAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>()).Returns((Post?)null);
 
-        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _dateTimeProvider);
+        var handler = new LikePostCommandHandler(_currentUserService, _postRepository, _publisher, _dateTimeProvider);
         var result = await handler.Handle(new LikePostCommand(Ulid.NewUlid()), CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -105,7 +107,7 @@ public class PostInteractionHandlerTests
         await _postRepository.AddCommentAsync(Arg.Do<Comment>(c => added = c), Arg.Any<CancellationToken>());
 
         var handler = new AddCommentCommandHandler(
-            _currentUserService, _userRepository, _postRepository, _dateTimeProvider);
+            _currentUserService, _userRepository, _postRepository, _publisher, _dateTimeProvider);
         var result = await handler.Handle(new AddCommentCommand(post.Id, "  nice post  "), CancellationToken.None);
 
         Assert.False(result.IsError);

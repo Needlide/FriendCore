@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
+using FriendCore.Application.Notifications.Events;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Users;
@@ -12,6 +13,7 @@ internal sealed class SendMessageCommandHandler(
     ICurrentUserService currentUserService,
     IMessagingRepository messagingRepository,
     IBlockRepository blockRepository,
+    IPublisher publisher,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<SendMessageCommand, ErrorOr<MessageResponse>>
 {
@@ -38,6 +40,10 @@ internal sealed class SendMessageCommandHandler(
         var message = messageResult.Value;
         conversation.RecordMessage(now);
         await messagingRepository.AddMessageAsync(message, cancellationToken);
+
+        if (conversation.OtherParticipantId(userId) is { } recipientId)
+            await publisher.Publish(
+                new MessageSentEvent(recipientId, userId, conversation.Id, now), cancellationToken);
 
         return MessageResponse.Create(message);
     }
