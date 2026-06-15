@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<TagMaintenanceOptions>(configuration.GetSection(TagMaintenanceOptions.SectionName));
         services.Configure<MediaProcessingOptions>(configuration.GetSection(MediaProcessingOptions.SectionName));
+        services.Configure<SeedingOptions>(configuration.GetSection(SeedingOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();

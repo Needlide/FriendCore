@@ -1,8 +1,10 @@
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using FriendCore.API.Authorization;
 using FriendCore.API.Extensions;
 using FriendCore.API.Realtime;
+using FriendCore.API.Security;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Users;
 using FriendCore.Application;
@@ -10,10 +12,13 @@ using FriendCore.Infrastructure;
 using FriendCore.Infrastructure.Authentication;
 using FriendCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+
+const string FrontendCorsPolicy = "frontend";
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -60,6 +65,38 @@ try
     builder.Services.AddSingleton<IUserIdProvider, UlidUserIdProvider>();
     // The push abstraction the application depends on; SignalR is the API-layer implementation.
     builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+
+    // Trust X-Forwarded-* from the reverse proxy so the real client IP/scheme reach the app
+    // (rate limiting, the moderation audit IP, and the admin IP-allowlist all depend on this).
+    // KnownProxies are configured per-environment (the Nginx container's address); empty in
+    // dev/test means forwarded headers are ignored and the direct connection IP is used.
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+        var knownProxies = builder.Configuration["ForwardedHeaders:KnownProxies"];
+        if (!string.IsNullOrWhiteSpace(knownProxies))
+            foreach (var entry in knownProxies.Split(',', StringSplitOptions.RemoveEmptyEntries |
+                                                         StringSplitOptions.TrimEntries))
+                if (IPAddress.TryParse(entry, out var proxy))
+                    options.KnownProxies.Add(proxy);
+    });
+
+    // CORS locked to the frontend origin(s) (§15.1). Falls back to the local dev frontend when
+    // unconfigured in Development; production sets Cors:AllowedOrigins to the real domain.
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    if (corsOrigins.Length == 0 && builder.Environment.IsDevelopment())
+        corsOrigins = ["http://localhost:3000"];
+    builder.Services.AddCors(options =>
+        options.AddPolicy(FrontendCorsPolicy, policy =>
+            policy.WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials())); // future-proofs the planned HttpOnly refresh-token cookie
+
+    builder.Services.Configure<AdminAccessOptions>(
+        builder.Configuration.GetSection(AdminAccessOptions.SectionName));
 
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -130,15 +167,53 @@ try
                 "Database migration skipped — ensure PostgreSQL is running (docker-compose -f docker-compose.dev.yml up -d)");
         }
 
+    // Must run first: rewrites RemoteIpAddress/scheme from X-Forwarded-* before anything reads them.
+    app.UseForwardedHeaders();
+
+    if (!app.Environment.IsDevelopment())
+        app.UseHsts();
+
+    // Baseline security response headers (HSTS is added by UseHsts above).
+    app.Use(async (context, next) =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        await next();
+    });
+
     app.UseSerilogRequestLogging();
 
     if (app.Environment.IsDevelopment())
         app.MapOpenApi();
 
     app.UseHttpsRedirection();
+    app.UseCors(FrontendCorsPolicy);
+
+    // §10.3: 404 the admin surface for non-allowlisted IPs (after forwarded headers; no-op if
+    // no allowlist is configured).
+    app.UseMiddleware<AdminIpAllowlistMiddleware>();
+
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // Production readiness nudges — these are spec non-negotiables that depend on deployment config.
+    if (app.Environment.IsProduction())
+    {
+        if (string.IsNullOrWhiteSpace(app.Configuration["ForwardedHeaders:KnownProxies"]))
+            Log.Warning("ForwardedHeaders:KnownProxies is empty in Production — the reverse proxy IP " +
+                        "will be seen as the client IP (affects rate limiting, audit IP, admin allowlist).");
+
+        var adminAccess = app.Configuration.GetSection(AdminAccessOptions.SectionName).Get<AdminAccessOptions>();
+        if (adminAccess is null || (adminAccess.AllowedIps.Length == 0 && adminAccess.AllowedNetworks.Length == 0))
+            Log.Warning("AdminAccess allowlist is empty in Production — /api/v1/admin is gated by role only " +
+                        "(no IP 404). Set AdminAccess:AllowedIps or :AllowedNetworks.");
+
+        if (corsOrigins.Length == 0)
+            Log.Warning("Cors:AllowedOrigins is empty in Production — no browser origin is permitted.");
+    }
 
     app.MapHealthChecks("/health");
     app.MapControllers().RequireRateLimiting(RateLimitingExtensions.ApiPolicy);
