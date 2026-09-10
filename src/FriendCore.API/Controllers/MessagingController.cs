@@ -3,6 +3,7 @@ using FriendCore.API.Extensions;
 using FriendCore.Application.Messaging.Commands.MarkConversationRead;
 using FriendCore.Application.Messaging.Commands.SendMessage;
 using FriendCore.Application.Messaging.Commands.StartConversation;
+using FriendCore.Application.Messaging.Commands.StartSupportConversation;
 using FriendCore.Application.Messaging.Queries.GetConversations;
 using FriendCore.Application.Messaging.Queries.GetMessages;
 using MediatR;
@@ -38,6 +39,21 @@ public sealed class MessagingController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new StartConversationCommand(request.Username), cancellationToken);
+        return result.ToCreatedResult();
+    }
+
+    /// <summary>
+    ///     Find-or-create the caller's 1:1 conversation with the support inbox. Informal channel
+    ///     (thanks, bug reports, quick questions) — not a substitute for the report/appeal system.
+    /// </summary>
+    [HttpPost("support")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> StartSupportConversation(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new StartSupportConversationCommand(), cancellationToken);
         return result.ToCreatedResult();
     }
 

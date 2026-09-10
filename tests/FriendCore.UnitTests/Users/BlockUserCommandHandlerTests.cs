@@ -127,4 +127,35 @@ public class BlockUserCommandHandlerTests
         Assert.True(result.IsError);
         Assert.Equal("User.NotFound", result.FirstError.Code);
     }
+
+    [Fact]
+    public async Task Handle_ReturnsCannotBlockAdmin_WhenTargetIsAdmin()
+    {
+        var admin = UserTestFactory.Create(username: "teamsupport", email: "support@example.com");
+        admin.AssignRole(UserRole.Admin);
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync(admin.UsernameSlug, Arg.Any<CancellationToken>())
+            .Returns(admin);
+
+        var result = await CreateHandler().Handle(
+            new BlockUserCommand(admin.Username, false), CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("User.CannotBlockAdmin", result.FirstError.Code);
+        await _blockRepository.DidNotReceiveWithAnyArgs().AddAndRemoveFollowsAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsCannotBlockAdmin_WhenActorIsAdmin()
+    {
+        var admin = UserTestFactory.Create(username: "moderator", email: "mod@example.com");
+        admin.AssignRole(UserRole.Admin);
+        _currentUserService.UserId.Returns(admin.Id);
+        _userRepository.GetByIdIgnoringBlocksAsync(admin.Id, Arg.Any<CancellationToken>()).Returns(admin);
+
+        var result = await CreateHandler().Handle(new BlockUserCommand("bob", false), CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("User.CannotBlockAdmin", result.FirstError.Code);
+        await _blockRepository.DidNotReceiveWithAnyArgs().AddAndRemoveFollowsAsync(default!, default);
+    }
 }

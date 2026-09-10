@@ -16,6 +16,11 @@ public static class MessagingErrors
     public static Error RecipientNotFound =>
         Error.NotFound("Messaging.RecipientNotFound", "User was not found.");
 
+    // No admin account exists to staff the support inbox — a server misconfiguration, hence
+    // Failure (→ 500), not NotFound. The client should show "support is unavailable, try later".
+    public static Error SupportUnavailable =>
+        Error.Failure("Messaging.SupportUnavailable", "Support chat is currently unavailable.");
+
     public static Error MessageContentRequired =>
         Error.Validation("Messaging.MessageContentRequired", "Message content is required.");
 

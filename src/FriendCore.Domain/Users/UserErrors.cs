@@ -38,6 +38,12 @@ public static class UserErrors
     public static Error CannotBlockSelf =>
         Error.Validation("User.CannotBlockSelf", "You cannot block yourself.");
 
+    // The admin account staffs the support inbox — blocking it would sever the user's help
+    // channel, so it is rejected (400) rather than hidden. Admins moderate via suspension/ban,
+    // never via blocks.
+    public static Error CannotBlockAdmin =>
+        Error.Validation("User.CannotBlockAdmin", "This account cannot be blocked.");
+
     public static Error CannotMuteSelf =>
         Error.Validation("User.CannotMuteSelf", "You cannot mute yourself.");
 

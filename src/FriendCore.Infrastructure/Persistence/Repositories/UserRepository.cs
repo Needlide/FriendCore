@@ -75,6 +75,17 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
+    public Task<User?> GetFirstAdminAsync(CancellationToken cancellationToken = default)
+    {
+        // Deterministic oldest-admin routing for the MVP single inbox. Skips only the block
+        // filter — soft-delete still applies, and a banned admin is filtered by the caller.
+        return context.Users
+            .IgnoreQueryFilters([AppDbContext.BlocksFilter])
+            .Where(user => user.Role == UserRole.Admin)
+            .OrderBy(user => user.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(
         Ulid tagId,
         CancellationToken cancellationToken = default)

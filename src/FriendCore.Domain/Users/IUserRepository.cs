@@ -21,6 +21,10 @@ public interface IUserRepository
 
     // Tracked, block-ignoring single load for moderation enforcement (suspend/ban mutate it).
     Task<User?> GetByIdIgnoringBlocksAsync(Ulid id, CancellationToken cancellationToken = default);
+
+    // Oldest Admin account — staffs the support inbox. Block filter is ignored so the help
+    // channel stays reachable even across a (legacy) block relationship.
+    Task<User?> GetFirstAdminAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> GetUsersWithProfileTagAsync(Ulid tagId, CancellationToken cancellationToken = default);
     Task<UserPreferences?> GetPreferencesAsync(Ulid userId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, UserPreferences preferences, CancellationToken cancellationToken = default);
