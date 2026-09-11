@@ -50,6 +50,22 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task GetPreferences_ReturnsDefaults_ThenReflectsPatch()
+    {
+        var (client, _) = await RegisterClient();
+
+        var initial = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.True(initial!.HideFlashingMedia);
+        Assert.Equal("General", initial.ContentPreference);
+
+        var patched = await SetContentPreference(client, "Sensitive");
+        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+
+        var after = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.Equal("Sensitive", after!.ContentPreference);
+    }
+
+    [Fact]
     public async Task Feed_ShowsOnlyContentUpToTheViewersPreference()
     {
         var (author, authorName) = await RegisterClient();

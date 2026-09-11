@@ -16,6 +16,7 @@ using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetKeywordFilters;
 using FriendCore.Application.Users.Queries.GetFollowers;
 using FriendCore.Application.Users.Queries.GetFollowing;
+using FriendCore.Application.Users.Queries.GetPreferences;
 using FriendCore.Application.Users.Queries.GetUserProfile;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -116,6 +117,16 @@ public sealed class UsersController(ISender sender) : ControllerBase
                 request.ContentPreference),
             cancellationToken);
 
+        return result.ToActionResult();
+    }
+
+    [HttpGet("me/preferences")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetPreferencesQuery(), cancellationToken);
         return result.ToActionResult();
     }
 
