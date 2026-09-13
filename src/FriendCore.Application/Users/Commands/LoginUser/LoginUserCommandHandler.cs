@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
+using FriendCore.Domain.Common;
 using FriendCore.Domain.Users;
 using MediatR;
 
@@ -16,8 +17,8 @@ internal sealed class LoginUserCommandHandler(
 {
     public async Task<ErrorOr<AuthTokens>> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
-        var user = await userRepository.GetByEmailAsync(email, cancellationToken);
+        var slug = User.ToUsernameSlug(request.Username);
+        var user = await userRepository.GetByUsernameSlugAsync(slug, cancellationToken);
 
         if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
             return UserErrors.InvalidCredentials;

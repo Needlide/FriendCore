@@ -20,9 +20,9 @@ public class RefreshTokenFlowTests(FriendCoreApiFactory factory) : IClassFixture
         return factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
     }
 
-    private static async Task<string> LoginAndGetRefreshCookie(HttpClient client, string email)
+    private async Task<string> LoginAndGetRefreshCookie(HttpClient client, string email)
     {
-        var login = await AuthScenarios.Login(client, email);
+        var login = await _scenarios.LoginAsync(client, email);
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         return ReadRefreshCookie(login);
     }
@@ -63,7 +63,7 @@ public class RefreshTokenFlowTests(FriendCoreApiFactory factory) : IClassFixture
         var email = AuthScenarios.UniqueEmail();
         await AuthScenarios.Register(client, email);
 
-        var login = await AuthScenarios.Login(client, email);
+        var login = await _scenarios.LoginAsync(client, email);
 
         var setCookie = ReadRawSetCookie(login);
         Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
@@ -94,7 +94,7 @@ public class RefreshTokenFlowTests(FriendCoreApiFactory factory) : IClassFixture
 
         // The freshly minted access token is accepted by an authorized endpoint.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.AccessToken);
-        var authorized = await client.PostAsync("/api/v1/auth/resend-verification", null);
+        var authorized = await client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { email });
         Assert.Equal(HttpStatusCode.NoContent, authorized.StatusCode);
     }
 

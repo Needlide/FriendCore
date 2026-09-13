@@ -65,7 +65,7 @@ public class KeywordFilterFlowTests(FriendCoreApiFactory factory) : IClassFixtur
 
         await aClient.PatchAsJsonAsync("/api/v1/users/me/keyword-filters", new { keywords = new[] { "wasps" } });
 
-        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.DoesNotContain(feed!.Posts, p => p.Id == matching);
         Assert.Contains(feed.Posts, p => p.Id == unrelated);
 
@@ -89,7 +89,7 @@ public class KeywordFilterFlowTests(FriendCoreApiFactory factory) : IClassFixtur
         await aClient.PatchAsJsonAsync("/api/v1/users/me/keyword-filters", new { keywords = new[] { "wasps" } });
 
         // Null content can never match a keyword — the SQL path must not drop it.
-        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Contains(feed!.Posts, p => p.Id == mediaOnly);
     }
 
@@ -106,7 +106,7 @@ public class KeywordFilterFlowTests(FriendCoreApiFactory factory) : IClassFixtur
             "/api/v1/users/me/keyword-filters", new { keywords = Array.Empty<string>() });
         Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
 
-        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Contains(feed!.Posts, p => p.Id == postId);
     }
 

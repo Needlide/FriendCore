@@ -3,4 +3,4 @@ using MediatR;
 
 namespace FriendCore.Application.Users.Commands.ResendVerificationEmail;
 
-public sealed record ResendVerificationEmailCommand : IRequest<ErrorOr<Success>>;
+public sealed record ResendVerificationEmailCommand(string Email) : IRequest<ErrorOr<Success>>;

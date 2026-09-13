@@ -16,11 +16,12 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         factory.Clock.Reset();
         var client = factory.CreateClient();
         var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
 
-        var registered = await AuthScenarios.Register(client, email);
+        var registered = await AuthScenarios.Register(client, email, username);
         var registerBody = await registered.Content.ReadFromJsonAsync<AuthResponse>();
 
-        var login = await AuthScenarios.Login(client, email);
+        var login = await AuthScenarios.LoginByUsername(client, username);
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
@@ -30,12 +31,12 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
     }
 
     [Fact]
-    public async Task Login_WithUnknownEmail_ReturnsUnauthorized()
+    public async Task Login_WithUnknownUsername_ReturnsUnauthorized()
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
 
-        var login = await AuthScenarios.Login(client, AuthScenarios.UniqueEmail());
+        var login = await AuthScenarios.LoginByUsername(client, AuthScenarios.NewUsername());
 
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
     }
@@ -46,10 +47,11 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         factory.Clock.Reset();
         var client = factory.CreateClient();
         var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
 
-        await AuthScenarios.Register(client, email);
+        await AuthScenarios.Register(client, email, username);
 
-        var login = await AuthScenarios.Login(client, email, "wrong-password");
+        var login = await AuthScenarios.LoginByUsername(client, username, "wrong-password");
 
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
     }
@@ -60,25 +62,25 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         factory.Clock.Reset();
         var client = factory.CreateClient();
         var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
 
-        await AuthScenarios.Register(client, email);
+        await AuthScenarios.Register(client, email, username);
         await _scenarios.BanUser(email);
 
-        var login = await AuthScenarios.Login(client, email);
+        var login = await AuthScenarios.LoginByUsername(client, username);
 
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
     }
 
     [Theory]
     [InlineData("", "password123")]
-    [InlineData("alice@example.com", "")]
-    [InlineData("not-an-email", "password123")]
-    public async Task Login_WithInvalidPayload_ReturnsBadRequest(string email, string password)
+    [InlineData("alice", "")]
+    public async Task Login_WithInvalidPayload_ReturnsBadRequest(string username, string password)
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
 
-        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { username, password });
 
         Assert.Equal(HttpStatusCode.BadRequest, login.StatusCode);
     }
@@ -89,13 +91,14 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         factory.Clock.Reset();
         var client = factory.CreateClient();
         var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
 
-        await AuthScenarios.Register(client, email);
-        var login = await AuthScenarios.Login(client, email);
+        await AuthScenarios.Register(client, email, username);
+        var login = await AuthScenarios.LoginByUsername(client, username);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
-        var resend = await client.PostAsync("/api/v1/auth/resend-verification", null);
+        var resend = await client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { email });
 
         Assert.Equal(HttpStatusCode.NoContent, resend.StatusCode);
     }

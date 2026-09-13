@@ -33,11 +33,11 @@ public class LoginUserCommandHandlerTests
     [Fact]
     public async Task Handle_ReturnsInvalidCredentials_WhenUserNotFound()
     {
-        _userRepository.GetByEmailAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userRepository.GetByUsernameSlugAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((User?)null);
 
         var result = await CreateHandler()
-            .Handle(new LoginUserCommand("ghost@example.com", "pw"), CancellationToken.None);
+            .Handle(new LoginUserCommand("ghost", "pw"), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(UserErrors.InvalidCredentials.Code, result.FirstError.Code);
@@ -48,10 +48,10 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsInvalidCredentials_WhenPasswordDoesNotMatch()
     {
         var user = UserTestFactory.Create();
-        _userRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepository.GetByUsernameSlugAsync(user.UsernameSlug, Arg.Any<CancellationToken>()).Returns(user);
         _passwordHasher.Verify("wrong", user.PasswordHash).Returns(false);
 
-        var result = await CreateHandler().Handle(new LoginUserCommand(user.Email, "wrong"), CancellationToken.None);
+        var result = await CreateHandler().Handle(new LoginUserCommand(user.Username, "wrong"), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(UserErrors.InvalidCredentials.Code, result.FirstError.Code);
@@ -62,10 +62,10 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsAccountBanned_WhenUserIsBanned()
     {
         var user = UserTestFactory.CreateBanned();
-        _userRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepository.GetByUsernameSlugAsync(user.UsernameSlug, Arg.Any<CancellationToken>()).Returns(user);
         _passwordHasher.Verify(Arg.Any<string>(), user.PasswordHash).Returns(true);
 
-        var result = await CreateHandler().Handle(new LoginUserCommand(user.Email, "pw"), CancellationToken.None);
+        var result = await CreateHandler().Handle(new LoginUserCommand(user.Username, "pw"), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(UserErrors.AccountBanned.Code, result.FirstError.Code);
@@ -73,25 +73,25 @@ public class LoginUserCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_NormalizesEmailBeforeLookup()
+    public async Task Handle_NormalizesUsernameBeforeLookup()
     {
         var user = UserTestFactory.Create();
-        _userRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepository.GetByUsernameSlugAsync(user.UsernameSlug, Arg.Any<CancellationToken>()).Returns(user);
         _passwordHasher.Verify(Arg.Any<string>(), user.PasswordHash).Returns(true);
 
-        await CreateHandler().Handle(new LoginUserCommand("  Alice@Example.com  ", "pw"), CancellationToken.None);
+        await CreateHandler().Handle(new LoginUserCommand("  Alice  ", "pw"), CancellationToken.None);
 
-        await _userRepository.Received(1).GetByEmailAsync(user.Email, Arg.Any<CancellationToken>());
+        await _userRepository.Received(1).GetByUsernameSlugAsync(user.UsernameSlug, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_RecordsLoginAndReturnsAuthResponse_OnSuccess()
     {
         var user = UserTestFactory.Create();
-        _userRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+        _userRepository.GetByUsernameSlugAsync(user.UsernameSlug, Arg.Any<CancellationToken>()).Returns(user);
         _passwordHasher.Verify("correct", user.PasswordHash).Returns(true);
 
-        var result = await CreateHandler().Handle(new LoginUserCommand(user.Email, "correct"), CancellationToken.None);
+        var result = await CreateHandler().Handle(new LoginUserCommand(user.Username, "correct"), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal("access-token", result.Value.Auth.AccessToken);

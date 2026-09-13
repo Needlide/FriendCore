@@ -23,7 +23,7 @@ public class RoleManagementFlowTests(FriendCoreApiFactory factory) : IClassFixtu
         var username = AuthScenarios.NewUsername();
         await AuthScenarios.Register(client, email, username);
         await _scenarios.PromoteUserAsync(email, UserRole.Admin);
-        var login = await AuthScenarios.Login(client, email);
+        var login = await _scenarios.LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (client, username, email);
@@ -61,7 +61,7 @@ public class RoleManagementFlowTests(FriendCoreApiFactory factory) : IClassFixtu
         Assert.Equal("Moderator", account!.Role);
 
         // The role takes effect in authorization on the target's NEXT login (fresh token claim).
-        var login = await AuthScenarios.Login(factory.CreateClient(), targetEmail);
+        var login = await _scenarios.LoginAsync(factory.CreateClient(), targetEmail);
         var token = (await login.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken;
         var promoted = ClientWithToken(factory, token);
 

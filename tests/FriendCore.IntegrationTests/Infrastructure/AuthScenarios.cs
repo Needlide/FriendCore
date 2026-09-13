@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
@@ -34,9 +36,40 @@ public class AuthScenarios(FriendCoreApiFactory factory)
             new { username = username ?? NewUsername(), displayName = "Test User", email, password });
     }
 
-    public static Task<HttpResponseMessage> Login(HttpClient client, string email, string password = DefaultPassword)
+    /// <summary>
+    ///     Test-only HMAC-SHA256 with the factory pepper — mirrors HmacEmailHashService so
+    ///     helpers can resolve users by the stored hash (plaintext is never persisted).
+    /// </summary>
+    public static string EmailHash(string email)
     {
-        return client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
+        var hash = HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes("integration-tests-email-pepper"),
+            Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant()));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    /// <summary>Direct username login (what the API expects).</summary>
+    public static Task<HttpResponseMessage> LoginByUsername(
+        HttpClient client,
+        string username,
+        string password = DefaultPassword)
+    {
+        return client.PostAsJsonAsync("/api/v1/auth/login", new { username, password });
+    }
+
+    /// <summary>
+    ///     Login by email for convenience: resolves the username from the stored hash, then
+    ///     posts the username login the API expects.
+    /// </summary>
+    public async Task<HttpResponseMessage> LoginAsync(
+        HttpClient client,
+        string email,
+        string password = DefaultPassword)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
+        return await client.PostAsJsonAsync("/api/v1/auth/login", new { username = user.Username, password });
     }
 
     public static async Task<string> RegisterAndGetToken(HttpClient client, string email)
@@ -60,7 +93,7 @@ public class AuthScenarios(FriendCoreApiFactory factory)
         var name = username ?? NewUsername();
         await Register(client, email, name);
         await MarkVerifiedAsync(email);
-        var login = await Login(client, email);
+        var login = await LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (client, name);
@@ -70,7 +103,7 @@ public class AuthScenarios(FriendCoreApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         user.MarkEmailVerified(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
     }
@@ -79,7 +112,7 @@ public class AuthScenarios(FriendCoreApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         assert(user);
     }
 
@@ -87,7 +120,7 @@ public class AuthScenarios(FriendCoreApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         return user.Id;
     }
 
@@ -119,7 +152,7 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         user.Ban(factory.Clock.UtcNow);
         await db.SaveChangesAsync();
     }
@@ -138,7 +171,7 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         user.AssignRole(role);
         await db.SaveChangesAsync();
     }
@@ -149,7 +182,7 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
         await Register(client, email);
         await PromoteUserAsync(email, role);
 
-        var login = await Login(client, email);
+        var login = await LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         return body!.AccessToken;
     }
@@ -197,7 +230,7 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
         assert(user.ProfileTags);
     }
 }

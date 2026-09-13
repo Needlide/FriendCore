@@ -109,7 +109,7 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", registerBody!.AccessToken);
 
-        var resend = await client.PostAsync("/api/v1/auth/resend-verification", null);
+        var resend = await client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { email });
         Assert.Equal(HttpStatusCode.NoContent, resend.StatusCode);
 
         await AssertTokens(email, tokens =>
@@ -143,7 +143,7 @@ public sealed class EmailVerificationFlowTests(FriendCoreApiFactory factory) : I
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var user = await db.Users.SingleAsync(u => u.EmailHash == AuthScenarios.EmailHash(email));
         var tokens = await db.EmailVerificationTokens
             .Where(t => t.UserId == user.Id)
             .ToListAsync();

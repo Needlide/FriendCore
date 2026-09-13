@@ -30,14 +30,14 @@ public class MuteFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendC
         await aClient.PostAsync($"/api/v1/users/{bUsername}/follow", content: null);
         var bPostId = await CreatePost(bClient, "muted away");
 
-        var feedBefore = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feedBefore = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Contains(feedBefore!.Posts, p => p.Id == bPostId);
 
         var mute = await aClient.PostAsync($"/api/v1/users/{bUsername}/mute", content: null);
         Assert.Equal(HttpStatusCode.NoContent, mute.StatusCode);
 
         // Gone from the feed…
-        var feedAfter = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feedAfter = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.DoesNotContain(feedAfter!.Posts, p => p.Id == bPostId);
 
         // …but mute is NOT a block: profile, direct post access, and the user's post listing
@@ -62,7 +62,7 @@ public class MuteFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendC
         await aClient.PostAsync($"/api/v1/users/{bUsername}/mute", content: null);
 
         // B (the muted one) is unaffected and unaware: A's posts stay in B's feed.
-        var bFeed = await bClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var bFeed = await bClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Contains(bFeed!.Posts, p => p.Id == aPostId);
         var aProfile = await bClient.GetAsync($"/api/v1/users/{aUsername}");
         Assert.Equal(HttpStatusCode.OK, aProfile.StatusCode);
@@ -93,7 +93,7 @@ public class MuteFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendC
         var unmute = await aClient.DeleteAsync($"/api/v1/users/{bUsername}/mute");
         Assert.Equal(HttpStatusCode.NoContent, unmute.StatusCode);
 
-        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await aClient.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Contains(feed!.Posts, p => p.Id == bPostId);
     }
 

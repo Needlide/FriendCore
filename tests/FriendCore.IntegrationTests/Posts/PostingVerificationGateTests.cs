@@ -22,7 +22,7 @@ public class PostingVerificationGateTests(FriendCoreApiFactory factory) : IClass
         var client = factory.CreateClient();
         var email = AuthScenarios.UniqueEmail();
         await AuthScenarios.Register(client, email, AuthScenarios.NewUsername());
-        var login = await AuthScenarios.Login(client, email);
+        var login = await new AuthScenarios(factory).LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (client, email);

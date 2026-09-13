@@ -35,12 +35,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
-        builder.Property(user => user.Email)
-            .HasColumnName("email")
-            .HasMaxLength(320)
+        builder.Property(user => user.EmailHash)
+            .HasColumnName("email_hash")
+            .HasMaxLength(64)
             .IsRequired();
 
-        builder.HasIndex(user => user.Email).IsUnique();
+        builder.HasIndex(user => user.EmailHash).IsUnique();
 
         builder.Property(user => user.PasswordHash)
             .HasColumnName("password_hash")

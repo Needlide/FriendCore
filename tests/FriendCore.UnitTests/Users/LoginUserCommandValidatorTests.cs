@@ -10,7 +10,7 @@ public class LoginUserCommandValidatorTests
     [Fact]
     public void Validate_Passes_ForValidCredentials()
     {
-        var result = _validator.Validate(new LoginUserCommand("alice@example.com", "password"));
+        var result = _validator.Validate(new LoginUserCommand("alice", "password"));
 
         Assert.True(result.IsValid);
     }
@@ -18,29 +18,18 @@ public class LoginUserCommandValidatorTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_Fails_WhenEmailEmpty(string email)
+    public void Validate_Fails_WhenUsernameEmpty(string username)
     {
-        var result = _validator.Validate(new LoginUserCommand(email, "password"));
+        var result = _validator.Validate(new LoginUserCommand(username, "password"));
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorCode == "User.Email.Required");
-    }
-
-    [Theory]
-    [InlineData("not-an-email")]
-    [InlineData("missing-domain@")]
-    public void Validate_Fails_WhenEmailMalformed(string email)
-    {
-        var result = _validator.Validate(new LoginUserCommand(email, "password"));
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorCode == "User.Email.InvalidFormat");
+        Assert.Contains(result.Errors, e => e.ErrorCode == "User.Username.Required");
     }
 
     [Fact]
     public void Validate_Fails_WhenPasswordEmpty()
     {
-        var result = _validator.Validate(new LoginUserCommand("alice@example.com", ""));
+        var result = _validator.Validate(new LoginUserCommand("alice", ""));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorCode == "User.Password.Required");
@@ -51,7 +40,7 @@ public class LoginUserCommandValidatorTests
     {
         var password = new string('a', PasswordValidationRules.MaxLength + 1);
 
-        var result = _validator.Validate(new LoginUserCommand("alice@example.com", password));
+        var result = _validator.Validate(new LoginUserCommand("alice", password));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorCode == PasswordValidationRules.TooLongCode);

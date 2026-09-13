@@ -29,14 +29,15 @@ public class UserRegistrationFlowTests(FriendCoreApiFactory factory) : IClassFix
 
         await _scenarios.AssertUser(email, user =>
         {
-            Assert.Equal(email, user.Email);
+            // Only the HMAC of the address is stored — the plaintext must be nowhere.
+            Assert.Equal(AuthScenarios.EmailHash(email), user.EmailHash);
             Assert.NotEqual(AuthScenarios.DefaultPassword, user.PasswordHash);
             Assert.False(user.IsVerified);
         });
     }
 
     [Fact]
-    public async Task Register_NormalizesEmailToLowercase()
+    public async Task Register_NormalizesEmailBeforeHashing()
     {
         factory.Clock.Reset();
         var client = factory.CreateClient();
@@ -46,7 +47,7 @@ public class UserRegistrationFlowTests(FriendCoreApiFactory factory) : IClassFix
         var registered = await AuthScenarios.Register(client, mixedCase);
         Assert.Equal(HttpStatusCode.Created, registered.StatusCode);
 
-        await _scenarios.AssertUser(email, user => Assert.Equal(email, user.Email));
+        await _scenarios.AssertUser(email, user => Assert.Equal(AuthScenarios.EmailHash(email), user.EmailHash));
     }
 
     [Fact]

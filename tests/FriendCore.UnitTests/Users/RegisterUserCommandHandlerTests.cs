@@ -12,6 +12,7 @@ public class RegisterUserCommandHandlerTests
 {
     private readonly IUserRepository _repository = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
+    private readonly IEmailHashService _emailHashService = Substitute.For<IEmailHashService>();
     private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
     private readonly IRefreshTokenService _refreshTokenService = Substitute.For<IRefreshTokenService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
@@ -20,6 +21,8 @@ public class RegisterUserCommandHandlerTests
     public RegisterUserCommandHandlerTests()
     {
         _passwordHasher.Hash(Arg.Any<string>()).Returns("hashed");
+        // Deterministic stand-in: the real HMAC mapping is covered by HmacEmailHashServiceTests.
+        _emailHashService.Hash(Arg.Any<string>()).Returns(call => "hash:" + call.Arg<string>());
         _jwtTokenService.GenerateAccessToken(Arg.Any<User>())
             .Returns(new AuthTokenResult("token", new DateTimeOffset(2026, 6, 16, 9, 0, 0, TimeSpan.Zero)));
         _refreshTokenService.IssueAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
@@ -28,13 +31,14 @@ public class RegisterUserCommandHandlerTests
     }
 
     private RegisterUserCommandHandler CreateHandler() =>
-        new(_repository, _passwordHasher, _jwtTokenService, _refreshTokenService, Options.Create(_seeding),
-            _dateTimeProvider);
+        new(_repository, _passwordHasher, _emailHashService, _jwtTokenService, _refreshTokenService,
+            Options.Create(_seeding), _dateTimeProvider);
 
     [Fact]
     public async Task Handle_ReturnsConflict_WhenEmailAlreadyExists()
     {
-        _repository.ExistsByEmailAsync("taken@example.com", Arg.Any<CancellationToken>()).Returns(true);
+        _repository.ExistsByEmailHashAsync("hash:taken@example.com", Arg.Any<CancellationToken>())
+            .Returns(true);
 
         var result = await CreateHandler().Handle(
             new RegisterUserCommand("newuser", "New User", "taken@example.com", "password123"),
@@ -45,17 +49,19 @@ public class RegisterUserCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_RegistersAsUser_ByDefault()
+    public async Task Handle_StoresHash_NeverPlaintext()
     {
         User? added = null;
         await _repository.AddAsync(
             Arg.Do<User>(u => added = u), Arg.Any<UserPreferences>(), Arg.Any<CancellationToken>());
 
         var result = await CreateHandler().Handle(
-            new RegisterUserCommand("alice", "Alice", "alice@example.com", "password123"), CancellationToken.None);
+            new RegisterUserCommand("alice", "Alice", "alice@example.com", "password123"),
+            CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal(UserRole.User, added!.Role);
+        Assert.Equal("hash:alice@example.com", added.EmailHash);
     }
 
     [Fact]
@@ -63,11 +69,13 @@ public class RegisterUserCommandHandlerTests
     {
         // §deployment bootstrap: a configured email becomes Admin on registration (case-insensitive).
         _seeding = new SeedingOptions { AdminEmails = ["Owner@Example.com"] };
+        var handler = CreateHandler();
+        _emailHashService.Hash("owner@example.com").Returns("hash:owner@example.com");
         User? added = null;
         await _repository.AddAsync(
             Arg.Do<User>(u => added = u), Arg.Any<UserPreferences>(), Arg.Any<CancellationToken>());
 
-        var result = await CreateHandler().Handle(
+        var result = await handler.Handle(
             new RegisterUserCommand("owner", "Owner", "owner@example.com", "password123"), CancellationToken.None);
 
         Assert.False(result.IsError);

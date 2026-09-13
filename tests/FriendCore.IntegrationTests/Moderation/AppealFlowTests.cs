@@ -23,7 +23,7 @@ public class AppealFlowTests(FriendCoreApiFactory factory) : IClassFixture<Frien
         var username = AuthScenarios.NewUsername();
         await AuthScenarios.Register(client, email, username);
         await _scenarios.MarkVerifiedAsync(email);
-        var login = await AuthScenarios.Login(client, email);
+        var login = await _scenarios.LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (client, username, email);
@@ -76,7 +76,7 @@ public class AppealFlowTests(FriendCoreApiFactory factory) : IClassFixture<Frien
         Assert.Equal(HttpStatusCode.NoContent, review.StatusCode);
 
         // Ban lifted — the offender can log in again.
-        var login = await AuthScenarios.Login(factory.CreateClient(), offenderEmail);
+        var login = await _scenarios.LoginAsync(factory.CreateClient(), offenderEmail);
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }
 

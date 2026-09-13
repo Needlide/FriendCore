@@ -2,6 +2,7 @@ using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Contracts.Users;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
+using FriendCore.Application.Tags.Queries.GetMyProfileTags;
 using FriendCore.API.Contracts.Moderation;
 using FriendCore.Application.Moderation.Commands.ReportUser;
 using FriendCore.Application.Users.Commands.BlockUser;
@@ -73,6 +74,16 @@ public sealed class UsersController(ISender sender) : ControllerBase
             .ToList();
 
         var result = await sender.Send(new UpdateProfileTagsCommand(tags), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("me/tags")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyProfileTags(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMyProfileTagsQuery(), cancellationToken);
         return result.ToActionResult();
     }
 

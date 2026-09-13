@@ -32,7 +32,7 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
         await CreatePost(stranger, "stranger post");
         await CreatePost(viewer, "my own post");
 
-        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
 
         Assert.Equal(2, feed!.Posts.Count);
         Assert.Equal("followed second", feed.Posts[0].Content);
@@ -51,7 +51,7 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
 
         await viewer.PostAsync($"/api/v1/posts/{postId}/like", null);
 
-        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
 
         var item = Assert.Single(feed!.Posts);
         Assert.True(item.IsLikedByCurrentUser);
@@ -64,7 +64,7 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
         factory.Clock.Reset();
         var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/api/v1/feed");
+        var response = await client.GetAsync("/api/v1/feed/home");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -76,7 +76,7 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
         var (other, _) = await AuthedClient();
         await CreatePost(other, "nobody follows me");
 
-        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
 
         Assert.Empty(feed!.Posts);
     }
@@ -94,12 +94,12 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
         for (var i = 0; i < total; i++)
             await CreatePost(followed, $"post-{i:D2}");
 
-        var page1 = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var page1 = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Equal(20, page1!.Posts.Count);
         Assert.NotNull(page1.NextCursor);
 
         var page2 = await viewer.GetFromJsonAsync<PostFeedResponse>(
-            $"/api/v1/feed?cursor={Uri.EscapeDataString(page1.NextCursor!)}");
+            $"/api/v1/feed/home?cursor={Uri.EscapeDataString(page1.NextCursor!)}");
         Assert.Equal(5, page2!.Posts.Count);
         Assert.Null(page2.NextCursor);
 
@@ -131,12 +131,12 @@ public class HomeFeedFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fri
         var tied = DateTimeOffset.UtcNow.AddMinutes(-5);
         var ids = await scenarios.SeedPostsWithSameTimestampAsync(authorId, total, tied);
 
-        var page1 = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var page1 = await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         Assert.Equal(20, page1!.Posts.Count);
         Assert.NotNull(page1.NextCursor);
 
         var page2 = await viewer.GetFromJsonAsync<PostFeedResponse>(
-            $"/api/v1/feed?cursor={Uri.EscapeDataString(page1.NextCursor!)}");
+            $"/api/v1/feed/home?cursor={Uri.EscapeDataString(page1.NextCursor!)}");
         Assert.Equal(5, page2!.Posts.Count);
         Assert.Null(page2.NextCursor);
 

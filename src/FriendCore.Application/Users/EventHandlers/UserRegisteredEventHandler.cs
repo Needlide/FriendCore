@@ -41,12 +41,12 @@ internal sealed class UserRegisteredEventHandler(
             var verificationUrl = EmailContentBuilder.BuildVerificationUrl(options, rawToken);
 
             await emailService.SendAsync(
-                EmailContentBuilder.Welcome(notification.Email, notification.DisplayName, options),
+                EmailContentBuilder.Welcome(notification.ContactEmail, notification.DisplayName, options),
                 cancellationToken);
 
             await emailService.SendAsync(
                 EmailContentBuilder.Verification(
-                    notification.Email,
+                    notification.ContactEmail,
                     notification.DisplayName,
                     verificationUrl,
                     options),

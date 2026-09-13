@@ -55,6 +55,36 @@ public class TagFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCo
     }
 
     [Fact]
+    public async Task GetMyProfileTags_RoundTripsTiersAndVisibility()
+    {
+        // Distinctive tag names: tag usage counts are global per test-class database,
+        // so reusing another test's tags would pollute its count assertions.
+        var client = await AuthenticatedClient(AuthScenarios.UniqueEmail());
+
+        var empty = await client.GetFromJsonAsync<ProfileTagsResponse>("/api/v1/users/me/tags");
+        Assert.Empty(empty!.Tags);
+
+        var update = await client.PutAsJsonAsync("/api/v1/users/me/tags", new
+        {
+            tags = new[]
+            {
+                new { name = "Zymurgy", tier = "Primary", isPublic = true },
+                new { name = "Xylophone", tier = "Secondary", isPublic = false }
+            }
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var fetched = await client.GetFromJsonAsync<ProfileTagsResponse>("/api/v1/users/me/tags");
+        Assert.Equal(2, fetched!.Tags.Count);
+        var primary = Assert.Single(fetched.Tags, t => t.Slug == "zymurgy");
+        Assert.Equal("Primary", primary.Tier);
+        Assert.True(primary.IsPublic);
+        var secondary = Assert.Single(fetched.Tags, t => t.Slug == "xylophone");
+        Assert.Equal("Secondary", secondary.Tier);
+        Assert.False(secondary.IsPublic);
+    }
+
+    [Fact]
     public async Task UpdateProfileTags_PersistsTagsAndIncrementsCounts()
     {
         var email = AuthScenarios.UniqueEmail();

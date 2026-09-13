@@ -4,4 +4,4 @@ using MediatR;
 
 namespace FriendCore.Application.Users.Commands.LoginUser;
 
-public sealed record LoginUserCommand(string Email, string Password) : IRequest<ErrorOr<AuthTokens>>;
+public sealed record LoginUserCommand(string Username, string Password) : IRequest<ErrorOr<AuthTokens>>;

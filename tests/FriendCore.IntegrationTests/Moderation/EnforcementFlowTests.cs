@@ -24,7 +24,7 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
         var username = AuthScenarios.NewUsername();
         await AuthScenarios.Register(client, email, username);
         await _scenarios.MarkVerifiedAsync(email);
-        var login = await AuthScenarios.Login(client, email);
+        var login = await _scenarios.LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (client, username, email);
@@ -90,7 +90,7 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
             new { action = "PermanentBan", reason = "repeated severe violations" });
         Assert.Equal(HttpStatusCode.NoContent, resolve.StatusCode);
 
-        var login = await AuthScenarios.Login(factory.CreateClient(), authorEmail);
+        var login = await _scenarios.LoginAsync(factory.CreateClient(), authorEmail);
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
     }
 
@@ -105,7 +105,7 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
             new { action = "TemporarySuspension", reason = "cooling off", suspensionDays = 7 });
         Assert.Equal(HttpStatusCode.NoContent, act.StatusCode);
 
-        var login = await AuthScenarios.Login(factory.CreateClient(), targetEmail);
+        var login = await _scenarios.LoginAsync(factory.CreateClient(), targetEmail);
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
 
         var account = await moderator.GetFromJsonAsync<UserAccountResponse>($"/api/v1/admin/users/{targetName}");
@@ -130,7 +130,7 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
         // Post survives, author can still log in.
         var fetch = await author.GetAsync($"/api/v1/posts/{postId}");
         Assert.Equal(HttpStatusCode.OK, fetch.StatusCode);
-        var login = await AuthScenarios.Login(factory.CreateClient(), authorEmail);
+        var login = await _scenarios.LoginAsync(factory.CreateClient(), authorEmail);
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
         // Re-resolving the now-closed report conflicts.

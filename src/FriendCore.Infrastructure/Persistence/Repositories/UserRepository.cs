@@ -7,9 +7,9 @@ namespace FriendCore.Infrastructure.Persistence.Repositories;
 public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : IUserRepository
 {
-    public Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
+    public Task<bool> ExistsByEmailHashAsync(string emailHash, CancellationToken cancellationToken = default)
     {
-        return context.Users.AnyAsync(user => user.Email == email, cancellationToken);
+        return context.Users.AnyAsync(user => user.EmailHash == emailHash, cancellationToken);
     }
 
     public Task<bool> ExistsByUsernameSlugAsync(string usernameSlug, CancellationToken cancellationToken = default)
@@ -17,9 +17,9 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         return context.Users.AnyAsync(user => user.UsernameSlug == usernameSlug, cancellationToken);
     }
 
-    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    public Task<User?> GetByEmailHashAsync(string emailHash, CancellationToken cancellationToken = default)
     {
-        return context.Users.FirstOrDefaultAsync(user => user.Email == email, cancellationToken);
+        return context.Users.FirstOrDefaultAsync(user => user.EmailHash == emailHash, cancellationToken);
     }
 
     public Task<User?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default)

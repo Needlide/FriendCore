@@ -24,7 +24,7 @@ public class RealtimeHubTests(FriendCoreApiFactory factory) : IClassFixture<Frie
         var email = AuthScenarios.UniqueEmail();
         var username = AuthScenarios.NewUsername();
         await AuthScenarios.Register(client, email, username);
-        var login = await AuthScenarios.Login(client, email);
+        var login = await new AuthScenarios(factory).LoginAsync(client, email);
         var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
         return (body!.AccessToken, username);
     }

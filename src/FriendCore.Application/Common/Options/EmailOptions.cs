@@ -17,4 +17,11 @@ public sealed class EmailOptions
     public string VerificationBaseUrl { get; init; } = "http://localhost:3000";
 
     public int VerificationTokenExpirationHours { get; init; } = 24;
+
+    /// <summary>
+    ///     Base URL for password-reset links. The handler appends /reset-password?token=...
+    /// </summary>
+    public string ResetBaseUrl { get; init; } = "http://localhost:3000";
+
+    public int ResetTokenExpirationHours { get; init; } = 2;
 }

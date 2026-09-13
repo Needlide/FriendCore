@@ -11,6 +11,7 @@ namespace FriendCore.Application.Users.Commands.RegisterUser;
 internal sealed class RegisterUserCommandHandler(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
+    IEmailHashService emailHashService,
     IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService,
     IOptions<SeedingOptions> seedingOptions,
@@ -19,10 +20,13 @@ internal sealed class RegisterUserCommandHandler(
 {
     public async Task<ErrorOr<AuthTokens>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
+        // The plaintext address lives only in this request: it is hashed for storage and
+        // passed transiently for the verification send. Nothing below persists it.
+        var email = User.NormalizeEmail(request.Email);
+        var emailHash = emailHashService.Hash(email);
         var slug = User.ToUsernameSlug(request.Username);
 
-        if (await userRepository.ExistsByEmailAsync(email, cancellationToken))
+        if (await userRepository.ExistsByEmailHashAsync(emailHash, cancellationToken))
             return UserErrors.EmailAlreadyInUse;
 
         if (await userRepository.ExistsByUsernameSlugAsync(slug, cancellationToken))
@@ -34,6 +38,7 @@ internal sealed class RegisterUserCommandHandler(
         var userResult = User.Register(
             request.Username,
             request.DisplayName,
+            emailHash,
             email,
             passwordHash,
             now);
@@ -44,9 +49,10 @@ internal sealed class RegisterUserCommandHandler(
         var user = userResult.Value;
 
         // Bootstrap admin (§ deployment): a configured email is granted Admin on registration, so
-        // the first admin can be created on a fresh database without manual SQL. Empty by default.
+        // the first admin can be created on a fresh database without manual SQL. Seeds are hashed
+        // the same way before comparing — plaintext seeds never touch the database either.
         if (seedingOptions.Value.AdminEmails.Any(seed =>
-                string.Equals(seed.Trim(), email, StringComparison.OrdinalIgnoreCase)))
+                emailHashService.Hash(User.NormalizeEmail(seed)) == emailHash))
             user.AssignRole(UserRole.Admin);
 
         var preferences = UserPreferences.CreateDefault(user.Id, now);

@@ -37,6 +37,7 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<EmailHashOptions>(configuration.GetSection(EmailHashOptions.SectionName));
         services.Configure<TagMaintenanceOptions>(configuration.GetSection(TagMaintenanceOptions.SectionName));
         services.Configure<MediaProcessingOptions>(configuration.GetSection(MediaProcessingOptions.SectionName));
         services.Configure<SeedingOptions>(configuration.GetSection(SeedingOptions.SectionName));
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+        services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IFollowRepository, FollowRepository>();
@@ -70,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.AddSingleton<IEmailVerificationTokenHasher, EmailVerificationTokenHasher>();
         services.AddHttpClient<IEmailService, ResendEmailService>();
+        services.AddSingleton<IEmailHashService, HmacEmailHashService>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();

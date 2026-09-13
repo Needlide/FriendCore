@@ -76,15 +76,15 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         var explicitPost = await CreatePost(author, "explicit post", "Explicit");
 
         // Fresh accounts default to General — the safe floor.
-        var defaultFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed"))!.Posts;
+        var defaultFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home"))!.Posts;
         Assert.Equal([general], defaultFeed.Select(p => p.Id).ToArray());
 
         await SetContentPreference(viewer, "Sensitive");
-        var sensitiveFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed"))!.Posts;
+        var sensitiveFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home"))!.Posts;
         Assert.Equal([sensitive, general], sensitiveFeed.Select(p => p.Id).ToArray());
 
         await SetContentPreference(viewer, "Explicit");
-        var explicitFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed"))!.Posts;
+        var explicitFeed = (await viewer.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home"))!.Posts;
         Assert.Equal([explicitPost, sensitive, general], explicitFeed.Select(p => p.Id).ToArray());
     }
 

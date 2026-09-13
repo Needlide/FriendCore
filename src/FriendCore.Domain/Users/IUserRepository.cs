@@ -2,9 +2,10 @@ namespace FriendCore.Domain.Users;
 
 public interface IUserRepository
 {
-    Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default);
+    // Email-hash lookups: parameters are HMAC hex strings, never plaintext addresses.
+    Task<bool> ExistsByEmailHashAsync(string emailHash, CancellationToken cancellationToken = default);
     Task<bool> ExistsByUsernameSlugAsync(string usernameSlug, CancellationToken cancellationToken = default);
-    Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<User?> GetByEmailHashAsync(string emailHash, CancellationToken cancellationToken = default);
     Task<User?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameSlugAsync(string usernameSlug, CancellationToken cancellationToken = default);
 

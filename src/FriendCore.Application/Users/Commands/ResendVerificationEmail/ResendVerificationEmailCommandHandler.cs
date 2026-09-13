@@ -11,6 +11,7 @@ namespace FriendCore.Application.Users.Commands.ResendVerificationEmail;
 internal sealed class ResendVerificationEmailCommandHandler(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
+    IEmailHashService emailHashService,
     IEmailVerificationTokenRepository tokenRepository,
     IEmailVerificationTokenHasher tokenHasher,
     IEmailService emailService,
@@ -32,6 +33,13 @@ internal sealed class ResendVerificationEmailCommandHandler(
         if (user.IsVerified)
             return UserErrors.EmailAlreadyVerified;
 
+        // The address is supplied per request and verified against the stored hash before
+        // anything is sent: without a match there is nowhere to send TO, so the result is
+        // a blind success that reveals nothing about which address (if any) is registered.
+        var email = User.NormalizeEmail(request.Email);
+        if (emailHashService.Hash(email) != user.EmailHash)
+            return Result.Success;
+
         var options = emailOptions.Value;
         var now = dateTimeProvider.UtcNow;
         var rawToken = tokenHasher.GenerateToken();
@@ -49,7 +57,7 @@ internal sealed class ResendVerificationEmailCommandHandler(
 
         var verificationUrl = EmailContentBuilder.BuildVerificationUrl(options, rawToken);
         await emailService.SendAsync(
-            EmailContentBuilder.Verification(user.Email, user.DisplayName, verificationUrl, options),
+            EmailContentBuilder.Verification(email, user.DisplayName, verificationUrl, options),
             cancellationToken);
 
         return Result.Success;

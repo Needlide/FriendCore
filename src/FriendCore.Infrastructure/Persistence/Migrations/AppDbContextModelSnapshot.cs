@@ -699,6 +699,46 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.ToTable("mutes", (string)null);
                 });
 
+            modelBuilder.Entity("FriendCore.Domain.Users.PasswordResetToken", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasFilter("consumed_at IS NULL");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("password_reset_tokens", (string)null);
+                });
+
             modelBuilder.Entity("FriendCore.Domain.Users.RefreshToken", b =>
                 {
                     b.Property<string>("Id")
@@ -768,11 +808,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("display_name");
 
-                    b.Property<string>("Email")
+                    b.Property<string>("EmailHash")
                         .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("email");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("email_hash");
 
                     b.Property<bool>("IsBanned")
                         .HasColumnType("boolean")
@@ -820,7 +860,7 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
+                    b.HasIndex("EmailHash")
                         .IsUnique();
 
                     b.HasIndex("UsernameSlug")

@@ -5,7 +5,9 @@ using FriendCore.Application.Users.Commands.LoginUser;
 using FriendCore.Application.Users.Commands.Logout;
 using FriendCore.Application.Users.Commands.RefreshToken;
 using FriendCore.Application.Users.Commands.RegisterUser;
+using FriendCore.Application.Users.Commands.RequestPasswordReset;
 using FriendCore.Application.Users.Commands.ResendVerificationEmail;
+using FriendCore.Application.Users.Commands.ResetPassword;
 using FriendCore.Application.Users.Commands.VerifyEmail;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -48,7 +50,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new LoginUserCommand(request.Email, request.Password), cancellationToken);
+        var result = await sender.Send(new LoginUserCommand(request.Username, request.Password), cancellationToken);
         return Authenticated(result, StatusCodes.Status200OK);
     }
 
@@ -103,9 +105,48 @@ public sealed class AuthController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ResendVerification(CancellationToken cancellationToken)
+    public async Task<IActionResult> ResendVerification(
+        [FromBody] ResendVerificationEmailRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new ResendVerificationEmailCommand(), cancellationToken);
+        var result = await sender.Send(new ResendVerificationEmailCommand(request.Email), cancellationToken);
+
+        return result.IsError
+            ? ErrorOrExtensions.FromErrors(result.Errors)
+            : NoContent();
+    }
+
+    /// <summary>
+    ///     Blind by design: always 204, whether the username exists and the email hash
+    ///     matches or not. Only an exact match sends anything (to the entered address).
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new RequestPasswordResetCommand(request.Username, request.Email),
+            cancellationToken);
+
+        return result.IsError
+            ? ErrorOrExtensions.FromErrors(result.Errors)
+            : NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ResetPasswordCommand(request.Token, request.NewPassword),
+            cancellationToken);
 
         return result.IsError
             ? ErrorOrExtensions.FromErrors(result.Errors)

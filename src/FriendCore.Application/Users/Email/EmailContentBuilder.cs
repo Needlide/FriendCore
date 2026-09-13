@@ -44,6 +44,30 @@ internal static class EmailContentBuilder
         return $"{baseUrl}/verify-email?token={Uri.EscapeDataString(rawToken)}";
     }
 
+    public static EmailMessage PasswordReset(
+        string to,
+        string displayName,
+        string resetUrl,
+        EmailOptions options)
+    {
+        return new EmailMessage(
+            to,
+            "Reset your FriendCore password",
+            $"""
+             <p>Hi {Encode(displayName)},</p>
+             <p>Click the link below to set a new password. This link expires in {options.ResetTokenExpirationHours} hours.</p>
+             <p><a href="{Encode(resetUrl)}">Reset password</a></p>
+             <p>If you did not request this, you can ignore this email.</p>
+             """,
+            $"Hi {displayName},\n\nReset your password: {resetUrl}\n\nThis link expires in {options.ResetTokenExpirationHours} hours.");
+    }
+
+    public static string BuildResetUrl(EmailOptions options, string rawToken)
+    {
+        var baseUrl = options.ResetBaseUrl.TrimEnd('/');
+        return $"{baseUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+    }
+
     private static string Encode(string value)
     {
         return WebUtility.HtmlEncode(value);

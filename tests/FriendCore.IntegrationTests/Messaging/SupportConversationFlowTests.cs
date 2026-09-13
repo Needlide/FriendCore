@@ -34,7 +34,7 @@ public class SupportConversationFlowTests(FriendCoreApiFactory factory) : IClass
         if (existing is not null)
         {
             var client = factory.CreateClient();
-            var login = await AuthScenarios.Login(client, existing.Email);
+            var login = await AuthScenarios.LoginByUsername(client, existing.Username);
             var body = await login.Content.ReadFromJsonAsync<AuthResponse>();
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", body!.AccessToken);
@@ -47,7 +47,7 @@ public class SupportConversationFlowTests(FriendCoreApiFactory factory) : IClass
         var username = AuthScenarios.NewUsername();
         await AuthScenarios.Register(adminClient, email, username);
         await _scenarios.PromoteUserAsync(email, UserRole.Admin);
-        var adminLogin = await AuthScenarios.Login(adminClient, email);
+        var adminLogin = await _scenarios.LoginAsync(adminClient, email);
         var adminBody = await adminLogin.Content.ReadFromJsonAsync<AuthResponse>();
         adminClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", adminBody!.AccessToken);

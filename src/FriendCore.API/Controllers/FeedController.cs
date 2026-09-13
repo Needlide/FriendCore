@@ -12,7 +12,7 @@ namespace FriendCore.API.Controllers;
 [EnableRateLimiting(RateLimitingExtensions.ApiPolicy)]
 public sealed class FeedController(ISender sender) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet("home")]
     [Authorize]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

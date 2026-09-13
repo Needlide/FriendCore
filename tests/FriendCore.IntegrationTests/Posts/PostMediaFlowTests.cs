@@ -66,7 +66,7 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         // And the follower's home feed does too.
         var (follower, _) = await AuthedClient();
         await follower.PostAsync($"/api/v1/users/{authorName}/follow", null);
-        var feed = await follower.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed");
+        var feed = await follower.GetFromJsonAsync<PostFeedResponse>("/api/v1/feed/home");
         var feedPost = Assert.Single(feed!.Posts);
         Assert.Equal(2, feedPost.Media.Count);
         Assert.Equal(new[] { firstId, secondId }, feedPost.Media.Select(m => m.Id));

@@ -18,7 +18,6 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim("username", user.Username),
             new Claim(ClaimTypes.Role, user.Role.ToString())
         };

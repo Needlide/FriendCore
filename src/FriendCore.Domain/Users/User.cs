@@ -23,7 +23,11 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public string Username { get; private set; } = null!;
     public string UsernameSlug { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
-    public string Email { get; private set; } = null!;
+    /// <summary>
+    ///     HMAC-SHA256 of the normalized email (lowercase hex). The plaintext address is NEVER
+    ///     persisted — it exists transiently per request (verification and reset sends) only.
+    /// </summary>
+    public string EmailHash { get; private set; } = null!;
     public string PasswordHash { get; private set; } = null!;
     public Ulid? AvatarMediaId { get; private set; }
     public UserProfile Profile { get; private set; } = null!;
@@ -39,7 +43,8 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public static ErrorOr<User> Register(
         string username,
         string displayName,
-        string email,
+        string emailHash,
+        string contactEmail,
         string passwordHash,
         DateTimeOffset createdAt)
     {
@@ -52,8 +57,9 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         if (string.IsNullOrWhiteSpace(displayName))
             return Error.Validation("User.InvalidDisplayName", "Display name is required.");
 
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-        if (normalizedEmail.Length is < 3 or > 320 || !normalizedEmail.Contains('@'))
+        // Only the hash reaches the domain — plaintext format is validated at the edge
+        // (command validators) before hashing.
+        if (string.IsNullOrWhiteSpace(emailHash))
             return UserErrors.InvalidEmail;
 
         var user = new User(Ulid.NewUlid(), createdAt)
@@ -61,7 +67,7 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
             Username = normalizedUsername,
             UsernameSlug = slug,
             DisplayName = displayName.Trim(),
-            Email = normalizedEmail,
+            EmailHash = emailHash,
             PasswordHash = passwordHash,
             Profile = UserProfile.Empty(),
             ContentPreference = ContentPreference.General,
@@ -72,7 +78,7 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
 
         user.RaiseDomainEvent(new UserRegisteredEvent(
             user.Id,
-            user.Email,
+            contactEmail,
             user.DisplayName,
             user.Username,
             createdAt));
@@ -161,6 +167,12 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         LastActiveAt = at;
     }
 
+    public void ChangePassword(string passwordHash, DateTimeOffset at)
+    {
+        PasswordHash = passwordHash;
+        UpdatedAt = at;
+    }
+
     public void AssignRole(UserRole role)
     {
         Role = role;
@@ -194,5 +206,11 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
     public static string ToUsernameSlug(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    /// <summary>Canonical form hashed for storage and lookup (never the raw address). </summary>
+    public static string NormalizeEmail(string email)
+    {
+        return email.Trim().ToLowerInvariant();
     }
 }

@@ -82,6 +82,8 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
                 ["Jwt:Issuer"] = JwtIssuer,
                 ["Jwt:Audience"] = JwtAudience,
                 ["Jwt:AccessTokenExpirationMinutes"] = "60",
+                // Test-only email-hash pepper (mirrors EmailHashing:Pepper in user-secrets).
+                ["EmailHashing:Pepper"] = "integration-tests-email-pepper",
                 // Small batch so the auto-archive drain loop crosses multiple batches in tests.
                 ["TagMaintenance:ArchiveBatchSize"] = "3",
                 ["Storage:Endpoint"] = _storage.GetConnectionString(),
