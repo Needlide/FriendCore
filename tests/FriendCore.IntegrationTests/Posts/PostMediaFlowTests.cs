@@ -87,6 +87,32 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
     }
 
     [Fact]
+    public async Task PostVariantUrl_IsPubliclyReadable_WithoutCredentials()
+    {
+        // The browser fetches the post response's variant URLs directly (never through the
+        // API). This performs that exact anonymous GET against the REAL server-built URL —
+        // it covers both the bucket policy (403 when private) and URL hygiene (400 on a
+        // double-slash path), the two stacked bugs that once broke every image silently.
+        var (author, _) = await AuthedClient();
+        var mediaId = await UploadReadyMedia(author, 800, 600);
+
+        var created = await CreatePost(author, "look", mediaId);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var post = await created.Content.ReadFromJsonAsync<PostResponse>();
+        var url = post!.Media.Single().Variants.Single(v => v.Type == "Medium").Url;
+        Assert.StartsWith("http", url);
+        Assert.DoesNotContain("//uploads/", url.Replace("://", ""));
+
+        using var anonymous = new HttpClient();
+        var response = await anonymous.GetAsync(url);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"GET {url} -> {(int)response.StatusCode}: {body}");
+        Assert.Equal("image/webp", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task CreatePost_WithProcessingMedia_ReturnsBadRequest()
     {
         var (author, _) = await AuthedClient();

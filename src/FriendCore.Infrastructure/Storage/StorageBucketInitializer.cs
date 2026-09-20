@@ -38,6 +38,17 @@ internal sealed class StorageBucketInitializer(
         {
             // Already provisioned — the normal case after first startup.
         }
+
+        // Media variants are served straight to browsers (never proxied through the API),
+        // so the bucket needs public read. Dev/test only: this initializer never runs in
+        // production (EnsureBucketExists off), where buckets are provisioned with proper policy.
+        var policy = $$"""
+            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::{{storage.Bucket}}/*"] }]}
+            """;
+        await client.PutBucketPolicyAsync(
+            new PutBucketPolicyRequest { BucketName = storage.Bucket, Policy = policy },
+            cancellationToken);
+        logger.LogInformation("Applied public-read policy to storage bucket {Bucket}", storage.Bucket);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

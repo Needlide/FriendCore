@@ -22,7 +22,7 @@ public sealed record PostMediaResponse(
             .OrderBy(variant => variant.Type)
             .Select(variant => new MediaVariantResponse(
                 variant.Type.ToString(),
-                $"{publicBaseUrl}/{variant.StorageKey}",
+                JoinUrl(publicBaseUrl, variant.StorageKey),
                 variant.WidthPx,
                 variant.HeightPx))
             .ToList();
@@ -32,5 +32,25 @@ public sealed record PostMediaResponse(
             media.HasFlashingWarning,
             media.HasIntenseMotionWarning,
             variants);
+    }
+
+    /// <summary>
+    ///     Joins a configured base URL with a storage key. Plain interpolation once produced
+    ///     "//bucket/..." paths (trailing slash in config), which S3 gateways reject with 400
+    ///     while the API logs nothing — every image silently broken. Collapse repeats past
+    ///     the scheme instead of trusting either side's slashes.
+    /// </summary>
+    internal static string JoinUrl(string? publicBaseUrl, string storageKey)
+    {
+        var combined = $"{(publicBaseUrl ?? string.Empty).TrimEnd('/')}/{storageKey.TrimStart('/')}";
+        var schemeEnd = combined.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0)
+            return combined;
+
+        var head = combined[..(schemeEnd + 3)];
+        var rest = combined[(schemeEnd + 3)..];
+        while (rest.Contains("//", StringComparison.Ordinal))
+            rest = rest.Replace("//", "/", StringComparison.Ordinal);
+        return head + rest;
     }
 }
