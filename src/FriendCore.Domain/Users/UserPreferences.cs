@@ -9,6 +9,11 @@ public sealed class UserPreferences
 
     private List<string> _keywordFilters = [];
 
+    // NotificationType names the user muted (empty = everything notifies).
+    // Stored as plain strings (text[] like KeywordFilters) so unknown future types
+    // fail open rather than crash reads.
+    private List<string> _mutedNotificationTypes = [];
+
     private UserPreferences()
     {
     }
@@ -19,6 +24,7 @@ public sealed class UserPreferences
     public bool DisableAutoplay { get; private set; } = true;
     public bool ReduceVisualNoise { get; private set; }
     public IReadOnlyList<string> KeywordFilters => _keywordFilters;
+    public IReadOnlyList<string> MutedNotificationTypes => _mutedNotificationTypes;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
@@ -60,6 +66,24 @@ public sealed class UserPreferences
         _keywordFilters = normalized;
         UpdatedAt = now;
         return Result.Success;
+    }
+
+    /// <summary>
+    ///     Whole-set replace of muted notification types. Unknown names are dropped (never
+    ///     stored) so a client sending a future type degrades to "not muted", not an error.
+    /// </summary>
+    public void SetMutedNotificationTypes(IReadOnlyList<string> types, DateTimeOffset now)
+    {
+        _mutedNotificationTypes = types
+            .Where(t => Enum.TryParse<Notifications.NotificationType>(t, out _))
+            .Distinct()
+            .ToList();
+        UpdatedAt = now;
+    }
+
+    public bool Mutes(Notifications.NotificationType type)
+    {
+        return _mutedNotificationTypes.Contains(type.ToString());
     }
 
     public static UserPreferences CreateDefault(Ulid userId, DateTimeOffset createdAt)

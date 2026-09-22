@@ -12,6 +12,14 @@ public interface INotificationRepository
 
     Task<int> CountUnreadAsync(Ulid recipientId, CancellationToken cancellationToken = default);
 
+    // Whether an unread notification of this type from this actor already waits —
+    // drives per-sender collapsing (one ping per conversation until read).
+    Task<bool> ExistsUnreadAsync(
+        Ulid recipientId,
+        Ulid actorId,
+        NotificationType type,
+        CancellationToken cancellationToken = default);
+
     // Marks every unread notification for the recipient as read; returns how many changed.
     Task<int> MarkAllReadAsync(Ulid recipientId, CancellationToken cancellationToken = default);
 }

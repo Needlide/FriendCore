@@ -9,6 +9,7 @@ namespace FriendCore.Application.Notifications.Services;
 internal sealed class NotificationService(
     INotificationRepository notificationRepository,
     IBlockRepository blockRepository,
+    IUserRepository userRepository,
     IRealtimeNotifier realtimeNotifier,
     ILogger<NotificationService> logger)
     : INotificationService
@@ -29,6 +30,20 @@ internal sealed class NotificationService(
         {
             // §8.1: no notifications are created between users with a block relationship.
             if (await blockRepository.ExistsBetweenAsync(recipientId, actorId, cancellationToken))
+                return;
+
+            // Muted types are never created (not merely hidden): unmuting reveals only
+            // future events, and the unread count stays truthful without client math.
+            var preferences = await userRepository.GetPreferencesAsync(recipientId, cancellationToken);
+            if (preferences is not null && preferences.Mutes(type))
+                return;
+
+            // One ping per sender until read: a 30-message burst from one person is a single
+            // notification; a second sender still notifies. Scoped to messages — likes and
+            // comments on different entities each carry their own information.
+            if (type == NotificationType.NewMessage
+                && await notificationRepository.ExistsUnreadAsync(
+                    recipientId, actorId, type, cancellationToken))
                 return;
 
             var notification = Notification.Create(recipientId, actorId, type, entityId, occurredAt);

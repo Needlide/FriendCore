@@ -19,7 +19,7 @@ using Testcontainers.PostgreSql;
 
 namespace FriendCore.IntegrationTests.Infrastructure;
 
-public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private const string JwtSecret = "integration-tests-secret-key-that-is-long-enough-32+";
     private const string JwtIssuer = "FriendCore.Tests";
@@ -51,6 +51,17 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
     public CapturingEmailService Emails { get; } = new();
 
     public MutableDateTimeProvider Clock { get; } = new();
+
+    /// <summary>
+    ///     When false, the real rate-limiter policies stay active (default true keeps them
+    ///     bypassed: the test server shares one partition key, so real limits would trip
+    ///     across unrelated tests). Set in a test-class constructor to exercise 429s —
+    ///     each class gets its own factory, so the blast radius stays inside that class.
+    /// </summary>
+    public bool BypassRateLimits { get; set; } = true;
+
+    /// <summary>What ConfigureWebHost observed at host-build time (diagnostic).</summary>
+    public bool RateLimitsBypassedAtBuild { get; private set; } = true;
 
     async Task IAsyncLifetime.InitializeAsync()
     {
@@ -103,6 +114,7 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
 
         builder.ConfigureTestServices(services =>
         {
+            RateLimitsBypassedAtBuild = BypassRateLimits;
             // Capture emails instead of hitting Resend — this is how the raw token is recovered.
             services.RemoveAll<IEmailService>();
             services.AddSingleton<IEmailService>(Emails);
@@ -124,12 +136,18 @@ public sealed class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyn
             // The test server gives every request the same partition key, so the real 10/min auth
             // limit would trip across tests. Replace the policy config with no-op limiters (the
             // rate-limiter core services stay registered from Program's AddApiRateLimiting call).
-            services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
-            services.Configure<RateLimiterOptions>(options =>
+            // BypassRateLimits=false leaves Program's registration untouched, so the test
+            // exercises the production policies verbatim.
+            if (BypassRateLimits)
             {
-                options.AddPolicy(RateLimitingExtensions.AuthPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
-                options.AddPolicy(RateLimitingExtensions.ApiPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
-            });
+                services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
+                services.Configure<RateLimiterOptions>(options =>
+                {
+                    options.AddPolicy(RateLimitingExtensions.AuthPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
+                    options.AddPolicy(RateLimitingExtensions.ApiPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
+                    options.AddPolicy(RateLimitingExtensions.MessagingPolicy, _ => RateLimitPartition.GetNoLimiter("test"));
+                });
+            }
         });
     }
 

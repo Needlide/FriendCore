@@ -32,6 +32,20 @@ public sealed class NotificationRepository(AppDbContext context) : INotification
             cancellationToken);
     }
 
+    public Task<bool> ExistsUnreadAsync(
+        Ulid recipientId,
+        Ulid actorId,
+        NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        return context.Notifications.AnyAsync(
+            notification => notification.RecipientId == recipientId
+                && notification.ActorId == actorId
+                && notification.Type == type
+                && !notification.IsRead,
+            cancellationToken);
+    }
+
     public Task<int> MarkAllReadAsync(Ulid recipientId, CancellationToken cancellationToken = default)
     {
         // Set-based bulk update — no entities loaded into the change tracker.

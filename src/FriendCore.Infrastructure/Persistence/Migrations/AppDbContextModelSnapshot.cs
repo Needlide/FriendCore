@@ -892,6 +892,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("text[]")
                         .HasColumnName("keyword_filters");
 
+                    b.PrimitiveCollection<string[]>("MutedNotificationTypes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("muted_notification_types");
+
                     b.Property<bool>("ReduceMotion")
                         .HasColumnType("boolean")
                         .HasColumnName("reduce_motion");

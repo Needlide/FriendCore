@@ -48,6 +48,33 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task MutedType_IsNeverCreated_UntilUnmuted()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+
+        var mute = await bob.PatchAsJsonAsync(
+            "/api/v1/users/me/notification-types", new { mutedTypes = new[] { "NewFollower" } });
+        Assert.Equal(HttpStatusCode.OK, mute.StatusCode);
+
+        await alice.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        Assert.Empty((await GetNotifications(bob)).Notifications);
+        Assert.Equal(0, await GetUnreadCount(bob));
+
+        var unmute = await bob.PatchAsJsonAsync(
+            "/api/v1/users/me/notification-types", new { mutedTypes = Array.Empty<string>() });
+        Assert.Equal(HttpStatusCode.OK, unmute.StatusCode);
+
+        // Unmuting reveals only future events — nothing backfills.
+        Assert.Empty((await GetNotifications(bob)).Notifications);
+
+        var (cara, caraName) = await RegisterClient();
+        await cara.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        var notification = Assert.Single((await GetNotifications(bob)).Notifications);
+        Assert.Equal(caraName, notification.Actor.Username);
+    }
+
+    [Fact]
     public async Task Like_NotifiesThePostAuthor_WithPostAsEntity()
     {
         var (author, _) = await RegisterClient();
@@ -91,6 +118,41 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
         Assert.Equal("NewMessage", notification.Type);
         Assert.Equal(aliceName, notification.Actor.Username);
         Assert.Equal(conversation.Id, notification.EntityId);
+    }
+
+    [Fact]
+    public async Task MessageBurst_CollapsesToOneNotification_UntilRead()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var (cara, caraName) = await RegisterClient();
+        var start = await alice.PostAsJsonAsync("/api/v1/conversations", new { username = bobName });
+        var conversation = await start.Content.ReadFromJsonAsync<ConversationResponse>();
+        var caraStart = await cara.PostAsJsonAsync("/api/v1/conversations", new { username = bobName });
+        var caraConversation = await caraStart.Content.ReadFromJsonAsync<ConversationResponse>();
+
+        // Three rapid messages from Alice: one ping, not three.
+        for (var i = 0; i < 3; i++)
+        {
+            var send = await alice.PostAsJsonAsync(
+                $"/api/v1/conversations/{conversation!.Id}/messages", new { content = $"m{i}" });
+            Assert.Equal(HttpStatusCode.Created, send.StatusCode);
+        }
+        Assert.Single((await GetNotifications(bob)).Notifications);
+
+        // A first message from a different sender still notifies.
+        await cara.PostAsJsonAsync(
+            $"/api/v1/conversations/{caraConversation!.Id}/messages", new { content = "hi" });
+        var notifications = (await GetNotifications(bob)).Notifications;
+        Assert.Equal(2, notifications.Count);
+        Assert.Contains(notifications, n => n.Actor.Username == caraName);
+
+        // Reading clears the collapse window: the next message pings again.
+        var read = await bob.PostAsync("/api/v1/notifications/read", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, read.StatusCode);
+        await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages", new { content = "again" });
+        Assert.Equal(1, await GetUnreadCount(bob));
     }
 
     [Fact]

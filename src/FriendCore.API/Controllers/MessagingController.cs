@@ -15,7 +15,7 @@ namespace FriendCore.API.Controllers;
 
 [ApiController]
 [Route("api/v1/conversations")]
-[EnableRateLimiting(RateLimitingExtensions.ApiPolicy)]
+[EnableRateLimiting(RateLimitingExtensions.MessagingPolicy)]
 public sealed class MessagingController(ISender sender) : ControllerBase
 {
     [HttpGet]

@@ -12,9 +12,11 @@ using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UnmuteUser;
 using FriendCore.Application.Users.Commands.UpdateKeywordFilters;
+using FriendCore.Application.Users.Commands.UpdateNotificationTypes;
 using FriendCore.Application.Users.Commands.UpdatePreferences;
 using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetKeywordFilters;
+using FriendCore.Application.Users.Queries.GetNotificationTypes;
 using FriendCore.Application.Users.Queries.GetFollowers;
 using FriendCore.Application.Users.Queries.GetFollowing;
 using FriendCore.Application.Users.Queries.GetPreferences;
@@ -161,6 +163,28 @@ public sealed class UsersController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new UpdateKeywordFiltersCommand(request.Keywords), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("me/notification-types")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetNotificationTypes(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetNotificationTypesQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPatch("me/notification-types")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateNotificationTypes(
+        [FromBody] UpdateNotificationTypesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UpdateNotificationTypesCommand(request.MutedTypes), cancellationToken);
         return result.ToActionResult();
     }
 

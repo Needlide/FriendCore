@@ -28,6 +28,11 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
             .HasField("_keywordFilters")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
+        builder.Property(preferences => preferences.MutedNotificationTypes)
+            .HasColumnName("muted_notification_types")
+            .HasField("_mutedNotificationTypes")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Property(preferences => preferences.CreatedAt).HasColumnName("created_at");
         builder.Property(preferences => preferences.UpdatedAt).HasColumnName("updated_at");
     }

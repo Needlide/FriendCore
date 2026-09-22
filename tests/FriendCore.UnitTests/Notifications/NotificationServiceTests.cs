@@ -14,12 +14,14 @@ public class NotificationServiceTests
 
     private readonly INotificationRepository _notificationRepository = Substitute.For<INotificationRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
+    private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
     private readonly Ulid _recipient = Ulid.NewUlid();
     private readonly Ulid _actor = Ulid.NewUlid();
 
     private NotificationService CreateService() =>
-        new(_notificationRepository, _blockRepository, _realtimeNotifier, NullLogger<NotificationService>.Instance);
+        new(_notificationRepository, _blockRepository, _userRepository, _realtimeNotifier,
+            NullLogger<NotificationService>.Instance);
 
     [Fact]
     public async Task CreateAsync_Persists_WhenAllowed()
@@ -74,5 +76,104 @@ public class NotificationServiceTests
             _recipient, _actor, NotificationType.NewMessage, Ulid.NewUlid(), Now, CancellationToken.None));
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SkipsMutedType_WithoutTouchingStorageOrPush()
+    {
+        var preferences = UserPreferences.CreateDefault(_recipient, Now);
+        preferences.SetMutedNotificationTypes(["NewFollower"], Now);
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(preferences);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewFollower, _actor, Now, CancellationToken.None);
+
+        await _notificationRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _realtimeNotifier.DidNotReceiveWithAnyArgs()
+            .NotificationReceivedAsync(default, default!, default);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CreatesUnmutedType_WhenOthersMuted()
+    {
+        var preferences = UserPreferences.CreateDefault(_recipient, Now);
+        preferences.SetMutedNotificationTypes(["NewFollower"], Now);
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(preferences);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewLike, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.Received(1).AddAsync(
+            Arg.Is<Notification>(n => n.Type == NotificationType.NewLike),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetMutedNotificationTypes_DropsUnknownNames()
+    {
+        var preferences = UserPreferences.CreateDefault(Ulid.NewUlid(), Now);
+        preferences.SetMutedNotificationTypes(["NewLike", "Nope", "NewLike"], Now);
+
+        Assert.Equal(["NewLike"], preferences.MutedNotificationTypes);
+        Assert.True(preferences.Mutes(NotificationType.NewLike));
+        Assert.False(preferences.Mutes(NotificationType.NewFollower));
+    }
+
+    [Fact]
+    public async Task CreateAsync_SkipsSecondMessage_WhileFirstIsUnread()
+    {
+        // One ping per sender until read: the recipient already has an unread NewMessage
+        // from this actor, so the burst's follow-ups create nothing (and push nothing).
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(UserPreferences.CreateDefault(_recipient, Now));
+        _notificationRepository
+            .ExistsUnreadAsync(_recipient, _actor, NotificationType.NewMessage, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewMessage, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _realtimeNotifier.DidNotReceiveWithAnyArgs()
+            .NotificationReceivedAsync(default, default!, default);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CollapseAppliesPerActor_NotGlobally()
+    {
+        // A pending ping from Alice must not swallow Bob's first message.
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(UserPreferences.CreateDefault(_recipient, Now));
+        _notificationRepository
+            .ExistsUnreadAsync(
+                _recipient, Arg.Is<Ulid>(id => id != _actor), NotificationType.NewMessage,
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewMessage, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.Received(1).AddAsync(
+            Arg.Any<Notification>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_DoesNotCollapse_Likes_OnDifferentPosts()
+    {
+        // Collapsing is messages-only: two likes from one actor on different posts each
+        // carry their own information and both are created.
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(UserPreferences.CreateDefault(_recipient, Now));
+        _notificationRepository
+            .ExistsUnreadAsync(_recipient, _actor, NotificationType.NewLike, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewLike, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.Received(1).AddAsync(
+            Arg.Any<Notification>(), Arg.Any<CancellationToken>());
     }
 }

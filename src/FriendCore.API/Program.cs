@@ -216,7 +216,11 @@ try
     }
 
     app.MapHealthChecks("/health");
-    app.MapControllers().RequireRateLimiting(RateLimitingExtensions.ApiPolicy);
+    // No global RequireRateLimiting here by design: every controller declares its own policy
+    // ([EnableRateLimiting]), and a global require OVERRIDES those (auth's 10/min and messaging's
+    // token bucket silently became the 120/min default — found because 11 rapid auth requests
+    // never tripped the 10/min window). Per-controller attributes are the only mechanism.
+    app.MapControllers();
 
     // Hubs require auth (the [Authorize] on each), reached via the access_token query string.
     app.MapHub<NotificationHub>("/hubs/notifications");

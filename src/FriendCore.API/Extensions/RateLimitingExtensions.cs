@@ -6,6 +6,7 @@ public static class RateLimitingExtensions
 {
     public const string AuthPolicy = "auth";
     public const string ApiPolicy = "api";
+    public const string MessagingPolicy = "messaging";
 
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
@@ -41,6 +42,21 @@ public static class RateLimitingExtensions
                     {
                         PermitLimit = 120,
                         Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            // DMs get their own bucket: bursts are normal chat behavior (fast consecutive
+            // sentences), sustained floods are not. Token bucket allows a burst of 10 and
+            // refills ~12/min — a letter-per-message spammer hits the wall almost immediately.
+            options.AddPolicy(MessagingPolicy, httpContext =>
+                RateLimitPartition.GetTokenBucketLimiter(
+                    GetPartitionKey(httpContext),
+                    _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = 10,
+                        TokensPerPeriod = 1,
+                        ReplenishmentPeriod = TimeSpan.FromSeconds(5),
                         QueueLimit = 0,
                         AutoReplenishment = true
                     }));
