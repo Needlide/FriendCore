@@ -905,6 +905,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("reduce_visual_noise");
 
+                    b.Property<DateTimeOffset?>("SnoozedUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snoozed_until_utc");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

@@ -12,7 +12,10 @@ using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UnmuteUser;
 using FriendCore.Application.Users.Commands.UpdateKeywordFilters;
+using FriendCore.Application.Users.Commands.ClearNotificationSnooze;
+using FriendCore.Application.Users.Commands.SetNotificationSnooze;
 using FriendCore.Application.Users.Commands.UpdateNotificationTypes;
+using FriendCore.Application.Users.Queries.GetNotificationSnooze;
 using FriendCore.Application.Users.Commands.UpdatePreferences;
 using FriendCore.Application.Users.Commands.UpdateProfile;
 using FriendCore.Application.Users.Queries.GetKeywordFilters;
@@ -186,6 +189,39 @@ public sealed class UsersController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new UpdateNotificationTypesCommand(request.MutedTypes), cancellationToken);
         return result.ToActionResult();
+    }
+
+    [HttpGet("me/snooze")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetNotificationSnooze(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetNotificationSnoozeQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPost("me/snooze")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SetNotificationSnooze(
+        [FromBody] SetNotificationSnoozeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new SetNotificationSnoozeCommand(request.Until), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpDelete("me/snooze")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ClearNotificationSnooze(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ClearNotificationSnoozeCommand(), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
     [HttpPost("{username}/block")]

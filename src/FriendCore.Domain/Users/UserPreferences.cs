@@ -25,6 +25,9 @@ public sealed class UserPreferences
     public bool ReduceVisualNoise { get; private set; }
     public IReadOnlyList<string> KeywordFilters => _keywordFilters;
     public IReadOnlyList<string> MutedNotificationTypes => _mutedNotificationTypes;
+
+    /// <summary>Silence-all until this instant (UTC); null means off. See notification snooze.</summary>
+    public DateTimeOffset? SnoozedUntilUtc { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
@@ -84,6 +87,21 @@ public sealed class UserPreferences
     public bool Mutes(Notifications.NotificationType type)
     {
         return _mutedNotificationTypes.Contains(type.ToString());
+    }
+
+    public void SetSnoozedUntil(DateTimeOffset? untilUtc, DateTimeOffset now)
+    {
+        SnoozedUntilUtc = untilUtc;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    ///     Single silencing predicate (mute and snooze compose with OR). Written as the one
+    ///     place a future quiet-hours schedule extends — a second clause, not a redesign.
+    /// </summary>
+    public bool IsSilenced(Notifications.NotificationType type, DateTimeOffset now)
+    {
+        return Mutes(type) || (SnoozedUntilUtc is { } until && until > now);
     }
 
     public static UserPreferences CreateDefault(Ulid userId, DateTimeOffset createdAt)

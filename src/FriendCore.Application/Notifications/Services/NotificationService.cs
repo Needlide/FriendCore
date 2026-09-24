@@ -11,6 +11,7 @@ internal sealed class NotificationService(
     IBlockRepository blockRepository,
     IUserRepository userRepository,
     IRealtimeNotifier realtimeNotifier,
+    IDateTimeProvider dateTimeProvider,
     ILogger<NotificationService> logger)
     : INotificationService
 {
@@ -34,8 +35,10 @@ internal sealed class NotificationService(
 
             // Muted types are never created (not merely hidden): unmuting reveals only
             // future events, and the unread count stays truthful without client math.
+            // Snoozing silences everything until its instant; both compose inside IsSilenced.
             var preferences = await userRepository.GetPreferencesAsync(recipientId, cancellationToken);
-            if (preferences is not null && preferences.Mutes(type))
+            if (preferences is not null
+                && preferences.IsSilenced(type, dateTimeProvider.UtcNow))
                 return;
 
             // One ping per sender until read: a 30-message burst from one person is a single

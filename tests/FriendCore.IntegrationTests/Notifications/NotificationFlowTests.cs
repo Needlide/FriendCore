@@ -168,6 +168,38 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task Snooze_SuppressesEverything_ThenResumes()
+    {
+        var (alice, aliceName) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+
+        // Past and over-24h windows are rejected, not stored.
+        var past = await bob.PostAsJsonAsync(
+            "/api/v1/users/me/snooze", new { until = DateTimeOffset.UtcNow.AddMinutes(-1) });
+        Assert.Equal(HttpStatusCode.BadRequest, past.StatusCode);
+        var far = await bob.PostAsJsonAsync(
+            "/api/v1/users/me/snooze", new { until = DateTimeOffset.UtcNow.AddHours(25) });
+        Assert.Equal(HttpStatusCode.BadRequest, far.StatusCode);
+
+        var snooze = await bob.PostAsJsonAsync(
+            "/api/v1/users/me/snooze", new { until = DateTimeOffset.UtcNow.AddHours(4) });
+        Assert.Equal(HttpStatusCode.OK, snooze.StatusCode);
+
+        await alice.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        Assert.Empty((await GetNotifications(bob)).Notifications);
+        Assert.Equal(0, await GetUnreadCount(bob));
+
+        var lift = await bob.DeleteAsync("/api/v1/users/me/snooze");
+        Assert.Equal(HttpStatusCode.NoContent, lift.StatusCode);
+
+        // A fresh event after lifting notifies (the snoozed follow stays buried).
+        var (cara, caraName) = await RegisterClient();
+        await cara.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        var notification = Assert.Single((await GetNotifications(bob)).Notifications);
+        Assert.Equal(caraName, notification.Actor.Username);
+    }
+
+    [Fact]
     public async Task UnreadCount_TracksAndClearsOnRead()
     {
         var (author, _) = await RegisterClient();

@@ -16,12 +16,18 @@ public class NotificationServiceTests
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
+    private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _recipient = Ulid.NewUlid();
     private readonly Ulid _actor = Ulid.NewUlid();
 
+    public NotificationServiceTests()
+    {
+        _dateTimeProvider.UtcNow.Returns(Now);
+    }
+
     private NotificationService CreateService() =>
         new(_notificationRepository, _blockRepository, _userRepository, _realtimeNotifier,
-            NullLogger<NotificationService>.Instance);
+            _dateTimeProvider, NullLogger<NotificationService>.Instance);
 
     [Fact]
     public async Task CreateAsync_Persists_WhenAllowed()
@@ -169,6 +175,37 @@ public class NotificationServiceTests
         _notificationRepository
             .ExistsUnreadAsync(_recipient, _actor, NotificationType.NewLike, Arg.Any<CancellationToken>())
             .Returns(true);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewLike, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.Received(1).AddAsync(
+            Arg.Any<Notification>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_SkipsEverything_WhileSnoozed()
+    {
+        var preferences = UserPreferences.CreateDefault(_recipient, Now);
+        preferences.SetSnoozedUntil(Now.AddHours(2), Now);
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(preferences);
+
+        await CreateService().CreateAsync(
+            _recipient, _actor, NotificationType.NewMessage, Ulid.NewUlid(), Now, CancellationToken.None);
+
+        await _notificationRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _realtimeNotifier.DidNotReceiveWithAnyArgs()
+            .NotificationReceivedAsync(default, default!, default);
+    }
+
+    [Fact]
+    public async Task CreateAsync_Resumes_AfterSnoozeExpiry()
+    {
+        var preferences = UserPreferences.CreateDefault(_recipient, Now);
+        preferences.SetSnoozedUntil(Now.AddHours(-1), Now);
+        _userRepository.GetPreferencesAsync(_recipient, Arg.Any<CancellationToken>())
+            .Returns(preferences);
 
         await CreateService().CreateAsync(
             _recipient, _actor, NotificationType.NewLike, Ulid.NewUlid(), Now, CancellationToken.None);

@@ -33,6 +33,9 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
             .HasField("_mutedNotificationTypes")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
+        builder.Property(preferences => preferences.SnoozedUntilUtc)
+            .HasColumnName("snoozed_until_utc");
+
         builder.Property(preferences => preferences.CreatedAt).HasColumnName("created_at");
         builder.Property(preferences => preferences.UpdatedAt).HasColumnName("updated_at");
     }

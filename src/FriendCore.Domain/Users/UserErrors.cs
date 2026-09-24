@@ -44,6 +44,9 @@ public static class UserErrors
     public static Error CannotBlockAdmin =>
         Error.Validation("User.CannotBlockAdmin", "This account cannot be blocked.");
 
+    public static Error InvalidSnoozeWindow =>
+        Error.Validation("User.InvalidSnoozeWindow", "Snooze must end in the future and within 24 hours.");
+
     public static Error CannotMuteSelf =>
         Error.Validation("User.CannotMuteSelf", "You cannot mute yourself.");
 
