@@ -33,6 +33,7 @@ public class FriendCoreApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         .Build();
 
     private readonly MinioContainer _storage = new MinioBuilder()
+        .WithImage("rustfs/rustfs:1.0.0")
         .WithUsername(StorageAccessKey)
         .WithPassword(StorageSecretKey)
         .Build();
