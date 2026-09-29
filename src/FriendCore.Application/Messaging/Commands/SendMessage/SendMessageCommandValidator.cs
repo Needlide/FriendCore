@@ -7,12 +7,19 @@ public sealed class SendMessageCommandValidator : AbstractValidator<SendMessageC
 {
     public SendMessageCommandValidator()
     {
+        // "At least one of text or media" is enforced twice on purpose: here for the
+        // request shape, and again in Message.Create for callers that bypass MediatR.
         RuleFor(command => command.Content)
-            .NotEmpty()
-            .WithErrorCode("Messaging.MessageContentRequired")
-            .WithMessage("Message content is required.")
-            .MaximumLength(Message.MaxContentLength)
-            .WithErrorCode("Messaging.MessageTooLong")
-            .WithMessage($"Message must not exceed {Message.MaxContentLength} characters.");
+            .Must((command, content) => !string.IsNullOrWhiteSpace(content) || command.MediaId is not null)
+            .WithErrorCode("Messaging.MessageEmpty")
+            .WithMessage("A message needs text or an attachment.")
+            .DependentRules(() =>
+            {
+                RuleFor(command => command.Content)
+                    .MaximumLength(Message.MaxContentLength)
+                    .WithErrorCode("Messaging.MessageTooLong")
+                    .WithMessage($"Message must not exceed {Message.MaxContentLength} characters.")
+                    .When(command => command.Content is not null);
+            });
     }
 }

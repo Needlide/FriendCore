@@ -1,8 +1,9 @@
+using FriendCore.Application.Common;
+using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Application.Common.Options;
 using FriendCore.Application.Discovery.Queries.GetDiscoveryPosts;
-using FriendCore.Application.Posts.Common;
 using FriendCore.Domain.Discovery;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
@@ -37,7 +38,7 @@ public class GetDiscoveryPostsQueryHandlerTests
 
     private GetDiscoveryPostsQueryHandler CreateHandler()
     {
-        var mediaFactory = new PostMediaResponseFactory(
+        var mediaFactory = new MediaResponseFactory(
             Substitute.For<IMediaRepository>(),
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
         var assembler = new PostResponseAssembler(

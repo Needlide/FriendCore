@@ -21,8 +21,8 @@ public static class MessagingErrors
     public static Error SupportUnavailable =>
         Error.Failure("Messaging.SupportUnavailable", "Support chat is currently unavailable.");
 
-    public static Error MessageContentRequired =>
-        Error.Validation("Messaging.MessageContentRequired", "Message content is required.");
+    public static Error MessageEmpty =>
+        Error.Validation("Messaging.MessageEmpty", "A message needs text or an attachment.");
 
     public static Error MessageTooLong =>
         Error.Validation("Messaging.MessageTooLong",

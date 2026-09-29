@@ -18,7 +18,17 @@ public sealed class Message : Entity<Ulid>, ISoftDeletable
 
     public Ulid ConversationId { get; private set; }
     public Ulid SenderId { get; private set; }
-    public string Content { get; private set; } = null!;
+
+    // Nullable since DMs gained attachments. A message carries text, an attachment, or
+    // both — Create enforces "at least one". A stored placeholder like "Sent a file" would
+    // be indistinguishable from something the user actually typed: it would be indexed,
+    // searchable, translatable, and quoted back in a report, none of which the user wrote.
+    public string? Content { get; private set; }
+
+    // At most one attachment, not a PostMedia-style junction: a chat bubble shows one
+    // image, and the extra table would buy nothing until a second slot is actually
+    // designed. PostMedia is the template if that day comes.
+    public Ulid? MediaItemId { get; private set; }
 
     // MVP is plaintext at rest (§5.6); E2EE is deferred (§15.2). The column exists so the
     // contract is stable when encryption lands.
@@ -34,20 +44,26 @@ public sealed class Message : Entity<Ulid>, ISoftDeletable
         Ulid conversationId,
         Ulid senderId,
         string? content,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Ulid? mediaItemId = null)
     {
         var trimmed = content?.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return MessagingErrors.MessageContentRequired;
+        var hasMedia = mediaItemId is not null;
 
-        if (trimmed.Length > MaxContentLength)
+        // At least one of the two, checked after trimming so "   " counts as empty.
+        if (string.IsNullOrWhiteSpace(trimmed) && !hasMedia)
+            return MessagingErrors.MessageEmpty;
+
+        if (trimmed is { Length: > MaxContentLength })
             return MessagingErrors.MessageTooLong;
 
         return new Message(Ulid.NewUlid(), createdAt)
         {
             ConversationId = conversationId,
             SenderId = senderId,
-            Content = trimmed,
+            // Whitespace-only alongside an attachment is noise, not a caption.
+            Content = string.IsNullOrWhiteSpace(trimmed) ? null : trimmed,
+            MediaItemId = mediaItemId,
             IsEncrypted = false,
             Status = MessageStatus.Sent
         };

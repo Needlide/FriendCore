@@ -24,9 +24,9 @@ internal sealed class DeleteMediaCommandHandler(
         if (media is null || media.UploaderId != userId)
             return MediaErrors.NotFound;
 
-        // Deleting media out from under a post could leave an image-only post with nothing in it;
-        // the post is the unit of deletion once media is attached.
-        var attached = await postRepository.GetAttachedMediaIdsAsync([media.Id], cancellationToken);
+        // Deleting media out from under a post or a message would leave an attachment-only
+        // message with nothing in it; the owning record is the unit of deletion once attached.
+        var attached = await mediaRepository.GetAttachedIdsAsync([media.Id], cancellationToken);
         if (attached.Count > 0)
             return MediaErrors.AttachedToPost;
 

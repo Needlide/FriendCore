@@ -77,7 +77,7 @@ public sealed class MessagingController(ISender sender) : ControllerBase
     [HttpPost("{id}/messages")]
     [Authorize]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendMessage(
@@ -88,7 +88,26 @@ public sealed class MessagingController(ISender sender) : ControllerBase
         if (!Ulid.TryParse(id, out var conversationId))
             return NotFound();
 
-        var result = await sender.Send(new SendMessageCommand(conversationId, request.Content), cancellationToken);
+        // A supplied-but-unparseable media id is a client bug, not an absent attachment.
+        // Silently coercing it to null would turn a request for an image into a
+        // successful TEXT-ONLY message — the caller would see 201 and never know the
+        // picture was dropped.
+        Ulid? mediaId = null;
+        if (request.MediaId is { Length: > 0 })
+        {
+            if (!Ulid.TryParse(request.MediaId, out var parsed))
+                return BadRequest(new
+                {
+                    errors = new Dictionary<string, string[]>
+                    {
+                        [nameof(request.MediaId)] = ["Media id is not a valid id."]
+                    }
+                });
+            mediaId = parsed;
+        }
+
+        var result = await sender.Send(
+            new SendMessageCommand(conversationId, request.Content, mediaId), cancellationToken);
         return result.ToCreatedResult();
     }
 

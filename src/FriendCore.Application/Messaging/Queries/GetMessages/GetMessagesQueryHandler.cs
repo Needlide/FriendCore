@@ -1,5 +1,6 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common;
 using FriendCore.Application.Common.Models;
 using FriendCore.Application.Messaging.Common;
 using FriendCore.Domain.Common;
@@ -12,7 +13,8 @@ namespace FriendCore.Application.Messaging.Queries.GetMessages;
 internal sealed class GetMessagesQueryHandler(
     ICurrentUserService currentUserService,
     IMessagingRepository messagingRepository,
-    IBlockRepository blockRepository)
+    IBlockRepository blockRepository,
+    MediaResponseFactory mediaResponseFactory)
     : IRequestHandler<GetMessagesQuery, ErrorOr<MessageFeedResponse>>
 {
     private const int PageSize = 20;
@@ -38,7 +40,12 @@ internal sealed class GetMessagesQueryHandler(
         var hasMore = messages.Count > PageSize;
         var page = hasMore ? messages.Take(PageSize).ToList() : messages;
 
-        var items = page.Select(MessageResponse.Create).ToList();
+        // One media lookup for the whole page, not one per message — same shape as the feed.
+        var mediaByMessage = await mediaResponseFactory.ForMessagesAsync(page, cancellationToken);
+
+        var items = page
+            .Select(message => MessageResponse.Create(message, mediaByMessage.GetValueOrDefault(message.Id)))
+            .ToList();
         var nextCursor = hasMore ? MessageCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 
         return new MessageFeedResponse(items, nextCursor);

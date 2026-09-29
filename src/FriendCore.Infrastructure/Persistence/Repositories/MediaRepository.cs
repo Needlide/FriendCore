@@ -1,4 +1,5 @@
 using FriendCore.Domain.Media;
+using FriendCore.Domain.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace FriendCore.Infrastructure.Persistence.Repositories;
@@ -27,6 +28,37 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
     {
         await context.MediaItems.AddAsync(media, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Ulid>> GetAttachedIdsAsync(
+        IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+
+        var inPosts = await context.PostMedia
+            .Where(link => ids.Contains(link.MediaItemId))
+            .Select(link => link.MediaItemId)
+            .ToListAsync(cancellationToken);
+
+        // Message.MediaItemId is a NULLABLE Ulid, and Npgsql cannot build the ANY(...)
+        // parameter for a Ulid?[] — it hunts for a JSON array mapping and throws before
+        // the query ever runs. Per-id equality is a plain indexed compare with a scalar
+        // parameter, which the conversion handles fine. A message carries at most one
+        // attachment and a post at most a handful, so this stays a handful of lookups.
+        var inMessages = new List<Ulid>();
+        foreach (var id in ids)
+        {
+            if (await context.Messages.AnyAsync(
+                    message => message.MediaItemId == (Ulid?)id, cancellationToken))
+                inMessages.Add(id);
+        }
+
+        // Union across both link tables, and soft-deleted owners still count: a deleted
+        // post's media stays in the table, so treating it as free would let the same
+        // upload be re-attached while the old row still references it.
+        return inPosts.Concat(inMessages).Distinct().ToList();
     }
 
     public async Task<IReadOnlyList<Ulid>> GetStuckProcessingIdsAsync(

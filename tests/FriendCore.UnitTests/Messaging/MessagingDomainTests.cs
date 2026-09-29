@@ -67,12 +67,49 @@ public class MessagingDomainTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Message_Create_RequiresContent(string? content)
+    public void Message_Create_WithoutTextOrAttachment_ReturnsError(string? content)
     {
         var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), content, Now);
 
         Assert.True(result.IsError);
-        Assert.Equal("Messaging.MessageContentRequired", result.FirstError.Code);
+        Assert.Equal("Messaging.MessageEmpty", result.FirstError.Code);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Message_Create_WithAttachmentAndNoText_Succeeds(string? content)
+    {
+        var mediaId = Ulid.NewUlid();
+
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), content, Now, mediaId);
+
+        Assert.False(result.IsError);
+        // Whitespace next to an attachment is noise, not a caption.
+        Assert.Null(result.Value.Content);
+        Assert.Equal(mediaId, result.Value.MediaItemId);
+    }
+
+    [Fact]
+    public void Message_Create_WithAttachmentAndText_KeepsBoth()
+    {
+        var mediaId = Ulid.NewUlid();
+
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "look at this", Now, mediaId);
+
+        Assert.False(result.IsError);
+        Assert.Equal("look at this", result.Value.Content);
+        Assert.Equal(mediaId, result.Value.MediaItemId);
+    }
+
+    [Fact]
+    public void Message_Create_TextOnly_NullsTheAttachment()
+    {
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hi", Now);
+
+        Assert.False(result.IsError);
+        Assert.Null(result.Value.MediaItemId);
     }
 
     [Fact]

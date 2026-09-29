@@ -26,8 +26,16 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(message => message.Content)
             .HasColumnName("content")
-            .HasMaxLength(Message.MaxContentLength)
-            .IsRequired();
+            .HasMaxLength(Message.MaxContentLength);
+
+        // Nullable: a message may carry only an attachment. Existing rows are all text,
+        // so the ALTER needs no backfill. The explicit text store type matters — left to
+        // inference, the nullable conversion makes Npgsql map the column as a JSON
+        // collection, which only surfaces when the column is used in an ANY(...) query.
+        builder.Property(message => message.MediaItemId)
+            .HasColumnName("media_item_id")
+            .HasColumnType("text")
+            .HasConversion(id => id == null ? null : id.ToString(), value => value == null ? null : Ulid.Parse(value));
 
         builder.Property(message => message.IsEncrypted).HasColumnName("is_encrypted");
 
@@ -43,5 +51,10 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         // index-ordered even across messages that share a created_at.
         builder.HasIndex(message => new { message.ConversationId, message.CreatedAt, message.Id })
             .HasFilter("deleted_at IS NULL");
+
+        // Serves the "is this upload already attached?" probe. Partial, because a
+        // text-only message has a null here and never needs the index.
+        builder.HasIndex(message => message.MediaItemId)
+            .HasFilter("media_item_id IS NOT NULL");
     }
 }

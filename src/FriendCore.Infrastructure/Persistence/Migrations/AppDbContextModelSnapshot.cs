@@ -119,7 +119,6 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("Content")
-                        .IsRequired()
                         .HasMaxLength(5000)
                         .HasColumnType("character varying(5000)")
                         .HasColumnName("content");
@@ -141,6 +140,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_encrypted");
 
+                    b.Property<string>("MediaItemId")
+                        .HasColumnType("text")
+                        .HasColumnName("media_item_id");
+
                     b.Property<string>("SenderId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -153,6 +156,9 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MediaItemId")
+                        .HasFilter("media_item_id IS NOT NULL");
 
                     b.HasIndex("ConversationId", "CreatedAt", "Id")
                         .HasFilter("deleted_at IS NULL");

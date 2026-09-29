@@ -5,17 +5,17 @@ namespace FriendCore.Application.Common.Models;
 public sealed record MediaVariantResponse(string Type, string Url, int WidthPx, int HeightPx);
 
 /// <summary>
-///     One media item attached to a post. Only the public WebP variants appear — the original is
+///     One media item attached to a post or a message. Only the public WebP variants appear — the original is
 ///     served exclusively via presigned URL (spec §7.3). The safety flags let clients honour the
 ///     §7.4 hide-flashing-media behaviour without an extra request.
 /// </summary>
-public sealed record PostMediaResponse(
+public sealed record MediaResponse(
     string Id,
     bool HasFlashingWarning,
     bool HasIntenseMotionWarning,
     IReadOnlyList<MediaVariantResponse> Variants)
 {
-    public static PostMediaResponse Create(MediaItem media, string? publicBaseUrl)
+    public static MediaResponse Create(MediaItem media, string? publicBaseUrl)
     {
         var variants = media.Variants
             .Where(variant => variant.Type != MediaVariantType.Original)
@@ -27,7 +27,7 @@ public sealed record PostMediaResponse(
                 variant.HeightPx))
             .ToList();
 
-        return new PostMediaResponse(
+        return new MediaResponse(
             media.Id.ToString(),
             media.HasFlashingWarning,
             media.HasIntenseMotionWarning,

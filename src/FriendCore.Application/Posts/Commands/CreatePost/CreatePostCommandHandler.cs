@@ -1,7 +1,6 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
-using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Tags.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Media;
@@ -9,6 +8,8 @@ using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 using MediatR;
+
+using FriendCore.Application.Common;
 
 namespace FriendCore.Application.Posts.Commands.CreatePost;
 
@@ -19,7 +20,7 @@ internal sealed class CreatePostCommandHandler(
     IMediaRepository mediaRepository,
     ITagRepository tagRepository,
     ITagNormalizer normalizer,
-    PostMediaResponseFactory mediaResponseFactory,
+    MediaResponseFactory mediaResponseFactory,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<CreatePostCommand, ErrorOr<PostResponse>>
 {
@@ -148,7 +149,9 @@ internal sealed class CreatePostCommandHandler(
         if (mediaItems.Any(media => !media.IsReady))
             return MediaErrors.NotReady;
 
-        var attached = await postRepository.GetAttachedMediaIdsAsync(mediaIds, cancellationToken);
+        // Union across posts AND messages, so the same upload cannot be attached twice by
+        // going out through a DM first.
+        var attached = await mediaRepository.GetAttachedIdsAsync(mediaIds, cancellationToken);
         return attached.Count > 0 ? MediaErrors.AlreadyAttached : null;
     }
 

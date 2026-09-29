@@ -1,8 +1,8 @@
+using FriendCore.Application.Common;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Options;
 using FriendCore.Application.Posts.Commands.CreatePost;
 using FriendCore.Application.Posts.Commands.DeletePost;
-using FriendCore.Application.Posts.Common;
 using FriendCore.Application.Tags.Services;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Posts;
@@ -32,13 +32,13 @@ public class PostCommandHandlerTests
         _currentUserService.UserId.Returns(_author.Id);
         _dateTimeProvider.UtcNow.Returns(Now);
         _userRepository.GetByIdAsync(_author.Id, Arg.Any<CancellationToken>()).Returns(_author);
-        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+        _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([]);
     }
 
     private CreatePostCommandHandler CreateHandler()
     {
-        var mediaFactory = new PostMediaResponseFactory(
+        var mediaFactory = new MediaResponseFactory(
             _mediaRepository,
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
         return new(
@@ -255,7 +255,7 @@ public class PostCommandHandlerTests
     {
         var media = ReadyMedia();
         MediaLookupReturns(media);
-        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+        _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([media.Id]);
 
         var result = await CreateHandler().Handle(

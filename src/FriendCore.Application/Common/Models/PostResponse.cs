@@ -15,14 +15,14 @@ public sealed record PostResponse(
     int CommentCount,
     bool IsLikedByCurrentUser,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<PostMediaResponse> Media,
+    IReadOnlyList<MediaResponse> Media,
     IReadOnlyList<PostTagResponse> Tags)
 {
     public static PostResponse Create(
         Post post,
         User author,
         bool isLikedByCurrentUser,
-        IReadOnlyList<PostMediaResponse> media,
+        IReadOnlyList<MediaResponse> media,
         IReadOnlyList<PostTagResponse> tags) =>
         new(
             post.Id.ToString(),

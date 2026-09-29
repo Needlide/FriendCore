@@ -4,4 +4,7 @@ using MediatR;
 
 namespace FriendCore.Application.Messaging.Commands.SendMessage;
 
-public sealed record SendMessageCommand(Ulid ConversationId, string Content) : IRequest<ErrorOr<MessageResponse>>;
+public sealed record SendMessageCommand(
+    Ulid ConversationId,
+    string? Content,
+    Ulid? MediaId = null) : IRequest<ErrorOr<MessageResponse>>;

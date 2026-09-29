@@ -12,6 +12,14 @@ public interface IMediaRepository
 
     Task AddAsync(MediaItem media, CancellationToken cancellationToken = default);
 
+    // Ids already linked to a post OR a message. Deliberately the UNION of both tables
+    // rather than one check per aggregate: "an upload is attachable once" is a property
+    // of the media item, so a per-aggregate check lets the same image go into a message
+    // and then a post, which is exactly what the rule exists to prevent.
+    Task<IReadOnlyList<Ulid>> GetAttachedIdsAsync(
+        IReadOnlyCollection<Ulid> ids,
+        CancellationToken cancellationToken = default);
+
     // Ids of items sitting in Processing since before the threshold — lost to a restart or a
     // dropped enqueue. The sweeper re-enqueues them.
     Task<IReadOnlyList<Ulid>> GetStuckProcessingIdsAsync(

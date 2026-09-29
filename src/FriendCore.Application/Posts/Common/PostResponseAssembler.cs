@@ -3,6 +3,8 @@ using FriendCore.Domain.Posts;
 using FriendCore.Domain.Tags;
 using FriendCore.Domain.Users;
 
+using FriendCore.Application.Common;
+
 namespace FriendCore.Application.Posts.Common;
 
 /// <summary>
@@ -15,7 +17,7 @@ internal sealed class PostResponseAssembler(
     IUserRepository userRepository,
     IPostRepository postRepository,
     ITagRepository tagRepository,
-    PostMediaResponseFactory mediaResponseFactory)
+    MediaResponseFactory mediaResponseFactory)
 {
     public async Task<List<PostResponse>> AssembleAsync(
         IReadOnlyList<Post> posts,

@@ -1,4 +1,5 @@
 using FluentValidation;
+using FriendCore.Application.Common;
 using FriendCore.Application.Common.Behaviors;
 using FriendCore.Application.Moderation.Services;
 using FriendCore.Application.Notifications.Services;
@@ -23,7 +24,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
 
         services.AddSingleton<ITagNormalizer, TagNormalizationService>();
-        services.AddScoped<PostMediaResponseFactory>();
+        services.AddScoped<MediaResponseFactory>();
         services.AddScoped<PostResponseAssembler>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IModerationService, ModerationService>();

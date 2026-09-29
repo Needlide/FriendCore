@@ -28,7 +28,7 @@ public class MediaHandlerTests
     {
         _currentUserService.UserId.Returns(_userId);
         _dateTimeProvider.UtcNow.Returns(Now);
-        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+        _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([]);
     }
 
@@ -148,7 +148,7 @@ public class MediaHandlerTests
     {
         var media = MediaItem.Create(_userId, "x.png", "image/png", "png", false, false, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
-        _postRepository.GetAttachedMediaIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
+        _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([media.Id]);
 
         var result = await DeleteHandler().Handle(new DeleteMediaCommand(media.Id), CancellationToken.None);

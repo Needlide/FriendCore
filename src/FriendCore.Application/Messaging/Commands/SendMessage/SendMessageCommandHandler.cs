@@ -1,8 +1,10 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Common;
 using FriendCore.Application.Common.Models;
 using FriendCore.Application.Notifications.Events;
 using FriendCore.Domain.Common;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Users;
 using MediatR;
@@ -13,6 +15,8 @@ internal sealed class SendMessageCommandHandler(
     ICurrentUserService currentUserService,
     IMessagingRepository messagingRepository,
     IBlockRepository blockRepository,
+    IMediaRepository mediaRepository,
+    MediaResponseFactory mediaResponseFactory,
     IRealtimeNotifier realtimeNotifier,
     IPublisher publisher,
     IDateTimeProvider dateTimeProvider)
@@ -34,7 +38,15 @@ internal sealed class SendMessageCommandHandler(
             return MessagingErrors.ConversationNotFound;
 
         var now = dateTimeProvider.UtcNow;
-        var messageResult = Message.Create(conversation.Id, userId, request.Content, now);
+
+        // Same gate the post path applies: the item must exist, belong to the sender, be
+        // finished processing, and not already be spoken for. Reusing MediaItem wholesale
+        // means DMs inherit the upload pipeline, variants, and safety flags unchanged.
+        var mediaError = await ValidateMediaAsync(request.MediaId, userId, cancellationToken);
+        if (mediaError is { } mediaFailure)
+            return mediaFailure;
+
+        var messageResult = Message.Create(conversation.Id, userId, request.Content, now, request.MediaId);
         if (messageResult.IsError)
             return messageResult.Errors;
 
@@ -42,7 +54,8 @@ internal sealed class SendMessageCommandHandler(
         conversation.RecordMessage(now);
         await messagingRepository.AddMessageAsync(message, cancellationToken);
 
-        var response = MessageResponse.Create(message);
+        var mediaByMessage = await mediaResponseFactory.ForMessagesAsync([message], cancellationToken);
+        var response = MessageResponse.Create(message, mediaByMessage.GetValueOrDefault(message.Id));
 
         if (conversation.OtherParticipantId(userId) is { } recipientId)
         {
@@ -54,5 +67,32 @@ internal sealed class SendMessageCommandHandler(
         }
 
         return response;
+    }
+
+    // Mirrors CreatePost's media gate, so an item that failed there cannot slip through here.
+    // Returns null when there is no attachment to check.
+    private async Task<Error?> ValidateMediaAsync(
+        Ulid? mediaId,
+        Ulid userId,
+        CancellationToken cancellationToken)
+    {
+        if (mediaId is not { } id)
+            return null;
+
+        var items = await mediaRepository.GetByIdsAsync([id], cancellationToken);
+        var media = items.FirstOrDefault();
+
+        if (media is null)
+            return MediaErrors.NotFound;
+
+        if (media.UploaderId != userId)
+            return MediaErrors.NotOwner;
+
+        if (!media.IsReady)
+            return MediaErrors.NotReady;
+
+        // Union across posts AND messages: an upload is attachable exactly once, anywhere.
+        var attached = await mediaRepository.GetAttachedIdsAsync([id], cancellationToken);
+        return attached.Count > 0 ? MediaErrors.AlreadyAttached : null;
     }
 }
