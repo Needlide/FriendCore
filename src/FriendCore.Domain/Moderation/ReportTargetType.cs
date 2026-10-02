@@ -9,5 +9,11 @@ public enum ReportTargetType
     User,
 
     /// <summary>A single DM. Reportable without exposing the rest of the conversation.</summary>
-    Message
+    Message,
+
+    /// <summary>
+    /// An uploaded image, identified by its own id so the same physical file can be reported
+    /// once whether it was seen in a post, a profile card or a DM.
+    /// </summary>
+    Media
 }

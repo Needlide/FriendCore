@@ -85,4 +85,18 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
         context.MediaItems.Remove(media);
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public Task<MediaItem?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default)
+    {
+        return context.MediaItems
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(media => media.Id == id, cancellationToken);
+    }
+
+    public void StageSoftDelete(MediaItem media)
+    {
+        // No save here: the moderation audit write commits the removal alongside its log entry,
+        // so no action can persist without an audit record (§10.3).
+        context.MediaItems.Remove(media);
+    }
 }

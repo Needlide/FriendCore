@@ -67,14 +67,14 @@ public class MediaManagementFlowTests(FriendCoreApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task ReportSafety_ByAnyUser_FlagsTheMedia()
+    public async Task Report_ByAnyUser_GatesTheMedia_AndReachesTheModeratorQueue()
     {
         var owner = await AuthedClient();
         var mediaId = await UploadReadyMedia(owner);
 
         var reporter = await AuthedClient();
         var response = await reporter.PostAsJsonAsync(
-            $"/api/v1/media/{mediaId}/report-safety", new { flashing = true, intenseMotion = false });
+            $"/api/v1/media/{mediaId}/report", new { category = "FlashingLights", note = "strobes badly" });
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
@@ -82,30 +82,41 @@ public class MediaManagementFlowTests(FriendCoreApiFactory factory) : IClassFixt
         var media = await scope.ServiceProvider.GetRequiredService<IMediaRepository>()
             .GetByIdAsync(Ulid.Parse(mediaId));
         Assert.True(media!.HasFlashingWarning);
-        Assert.False(media.HasIntenseMotionWarning);
+        Assert.True(media.HasIntenseMotionWarning);
         Assert.Equal(MediaSafetySource.UserReports, media.SafetySource);
     }
 
     [Fact]
-    public async Task ReportSafety_WithNoCategories_ReturnsBadRequest()
+    public async Task Report_Self_ReturnsBadRequest()
+    {
+        var owner = await AuthedClient();
+        var mediaId = await UploadReadyMedia(owner);
+
+        var response = await owner.PostAsJsonAsync(
+            $"/api/v1/media/{mediaId}/report", new { category = "FlashingLights" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Report_InvalidCategory_ReturnsBadRequest()
     {
         var client = await AuthedClient();
         var mediaId = await UploadReadyMedia(client);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/v1/media/{mediaId}/report-safety", new { flashing = false, intenseMotion = false });
+            $"/api/v1/media/{mediaId}/report", new { category = "NotACategory" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("Media.SafetyCategoryRequired", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task ReportSafety_UnknownMedia_ReturnsNotFound()
+    public async Task Report_UnknownMedia_ReturnsNotFound()
     {
         var client = await AuthedClient();
 
         var response = await client.PostAsJsonAsync(
-            $"/api/v1/media/{Ulid.NewUlid()}/report-safety", new { flashing = true, intenseMotion = false });
+            $"/api/v1/media/{Ulid.NewUlid()}/report", new { category = "FlashingLights" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

@@ -1,6 +1,5 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Media.Commands.DeleteMedia;
-using FriendCore.Application.Media.Commands.ReportMediaSafety;
 using FriendCore.Application.Media.Commands.UploadMedia;
 using FriendCore.Application.Media.Queries.GetMediaStatus;
 using FriendCore.Domain.Media;
@@ -127,9 +126,6 @@ public class MediaHandlerTests
     private DeleteMediaCommandHandler DeleteHandler() =>
         new(_currentUserService, _mediaRepository, _postRepository);
 
-    private ReportMediaSafetyCommandHandler ReportHandler() =>
-        new(_currentUserService, _mediaRepository, _dateTimeProvider);
-
     [Fact]
     public async Task Delete_ReturnsNotFound_ForAnotherUsersMedia()
     {
@@ -168,34 +164,5 @@ public class MediaHandlerTests
 
         Assert.False(result.IsError);
         await _mediaRepository.Received(1).SoftDeleteAsync(media, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Report_ReturnsNotFound_WhenMissing()
-    {
-        _mediaRepository.GetByIdAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>()).Returns((MediaItem?)null);
-
-        var result = await ReportHandler().Handle(
-            new ReportMediaSafetyCommand(Ulid.NewUlid(), true, false), CancellationToken.None);
-
-        Assert.True(result.IsError);
-        Assert.Equal("Media.NotFound", result.FirstError.Code);
-    }
-
-    [Fact]
-    public async Task Report_FlagsAnyUsersMedia_AsUserReports()
-    {
-        // Reporter is not the uploader — reports are open to all authenticated users (§7.4).
-        var media = MediaItem.Create(Ulid.NewUlid(), "x.png", "image/png", "png", false, false, Now);
-        _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
-
-        var result = await ReportHandler().Handle(
-            new ReportMediaSafetyCommand(media.Id, true, false), CancellationToken.None);
-
-        Assert.False(result.IsError);
-        Assert.True(media.HasFlashingWarning);
-        Assert.Equal(MediaSafetySource.UserReports, media.SafetySource);
-        Assert.Equal(Now, media.SafetyFlaggedAt);
-        await _mediaRepository.Received(1).UpdateAsync(Arg.Any<CancellationToken>());
     }
 }

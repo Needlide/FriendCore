@@ -1,9 +1,10 @@
 using FriendCore.API.Contracts.Media;
+using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Media.Commands.DeleteMedia;
-using FriendCore.Application.Media.Commands.ReportMediaSafety;
 using FriendCore.Application.Media.Commands.UploadMedia;
 using FriendCore.Application.Media.Queries.GetMediaStatus;
+using FriendCore.Application.Moderation.Commands.ReportMedia;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -74,23 +75,35 @@ public sealed class MediaController(ISender sender) : ControllerBase
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
-    [HttpPost("{id}/report-safety")]
+    /// <summary>
+    /// Files an image into the moderation queue under §13.4's categories.
+    ///
+    /// Replaces the old <c>{flashing, intenseMotion}</c> safety endpoint, which called
+    /// media.FlagSafety and returned without ever creating a Report — so the image was gated
+    /// for opted-in readers but invisible to every moderator queue, metric and appeal record.
+    /// §7.4's layer 2 was effectively switched off. A real Report is what makes it visible,
+    /// deduped, resolvable and auditable.
+    ///
+    /// Reporting with category FlashingLights (which covers intense motion too) additionally
+    /// gates the image immediately, in the same transaction — a report a moderator may not see
+    /// for hours should not leave harmful media in front of the people who opted out of it.
+    /// </summary>
+    [HttpPost("{id}/report")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ReportSafety(
+    public async Task<IActionResult> Report(
         string id,
-        [FromBody] ReportMediaSafetyRequest request,
+        [FromBody] ReportRequest request,
         CancellationToken cancellationToken)
     {
         if (!Ulid.TryParse(id, out var mediaId))
             return NotFound();
 
         var result = await sender.Send(
-            new ReportMediaSafetyCommand(mediaId, request.Flashing, request.IntenseMotion),
-            cancellationToken);
+            new ReportMediaCommand(mediaId, request.Category, request.Note), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 }

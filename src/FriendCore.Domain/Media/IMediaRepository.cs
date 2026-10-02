@@ -31,4 +31,12 @@ public interface IMediaRepository
     Task UpdateAsync(CancellationToken cancellationToken = default);
 
     Task SoftDeleteAsync(MediaItem media, CancellationToken cancellationToken = default);
+
+    // Moderator view: soft-deleted rows included, so a moderator can see and act on media that
+    // a previous action already removed.
+    Task<MediaItem?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default);
+
+    // Soft-delete staged for a moderator's SaveChanges, matching PostRepository's shape so the
+    // removal and the audit entry commit together (§10.3).
+    void StageSoftDelete(MediaItem media);
 }

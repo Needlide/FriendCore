@@ -1,5 +1,6 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Services;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
@@ -17,6 +18,7 @@ public class ModerationServiceTests
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
+    private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
     private readonly IAdminAuditLogRepository _auditLogRepository = Substitute.For<IAdminAuditLogRepository>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _moderatorId = Ulid.NewUlid();
@@ -30,7 +32,7 @@ public class ModerationServiceTests
 
     private ModerationService CreateService() =>
         new(_currentUserService, _userRepository, _postRepository, _messagingRepository,
-            _auditLogRepository, _dateTimeProvider);
+            _mediaRepository, _auditLogRepository, _dateTimeProvider);
 
     private static Report PostReport(Ulid postId) =>
         Report.Create(Ulid.NewUlid(), ReportTargetType.Post, postId, ReportCategory.Spam, null, Now).Value;
@@ -221,5 +223,53 @@ public class ModerationServiceTests
         // who reported it, nor fail because the target is a message rather than a post.
         Assert.NotNull(sender.SuspendedUntil);
         Assert.Equal(Now.AddDays(7), sender.SuspendedUntil);
+    }
+
+    [Fact]
+    public async Task ContentRemoval_OnMediaTarget_SoftDeletesTheImage_AndLogsAgainstIt()
+    {
+        var media = MediaItem.Create(
+            UserTestFactory.Create(username: "uploader").Id, "a.png", "image/png", ".png",
+            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+        var report = Report.Create(
+            Ulid.NewUlid(), ReportTargetType.Media, media.Id, ReportCategory.FlashingLights, null, Now).Value;
+        _mediaRepository.GetByIdForModerationAsync(media.Id, Arg.Any<CancellationToken>())
+            .Returns(media);
+
+        var result = await CreateService().ExecuteAsync(
+            ModerationActionType.ContentRemoval, ReportTargetType.Media, media.Id, "harmful", null, report,
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        // Removing the media is what takes the image out of circulation — posts and messages
+        // reference it, so the row going away is what every reader actually sees.
+        _mediaRepository.Received(1).StageSoftDelete(media);
+        await _auditLogRepository.Received(1).AddAndSaveAsync(
+            Arg.Is<AdminAuditLog>(e =>
+                e.Action == ModerationActionType.ContentRemoval
+                && e.TargetType == ReportTargetType.Media
+                && e.TargetId == media.Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Suspension_OnMediaReport_HitsTheUploader()
+    {
+        var uploader = UserTestFactory.Create(username: "uploader");
+        var media = MediaItem.Create(
+            uploader.Id, "a.png", "image/png", ".png",
+            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+        _mediaRepository.GetByIdForModerationAsync(media.Id, Arg.Any<CancellationToken>())
+            .Returns(media);
+        _userRepository.GetByIdIgnoringBlocksAsync(uploader.Id, Arg.Any<CancellationToken>())
+            .Returns(uploader);
+
+        var result = await CreateService().ExecuteAsync(
+            ModerationActionType.TemporarySuspension, ReportTargetType.Media, media.Id, "harmful", 7, null,
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        // The uploader, who is not necessarily whoever published the post it landed in.
+        Assert.Equal(Now.AddDays(7), uploader.SuspendedUntil);
     }
 }

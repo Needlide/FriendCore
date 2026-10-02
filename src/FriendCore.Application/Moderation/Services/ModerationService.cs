@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Common;
+using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
@@ -13,6 +14,7 @@ internal sealed class ModerationService(
     IUserRepository userRepository,
     IPostRepository postRepository,
     IMessagingRepository messagingRepository,
+    IMediaRepository mediaRepository,
     IAdminAuditLogRepository auditLogRepository,
     IDateTimeProvider dateTimeProvider)
     : IModerationService
@@ -41,7 +43,7 @@ internal sealed class ModerationService(
             case ModerationActionType.ContentRemoval:
                 // Removal acts on content. A User target has no content to remove, so the
                 // ladder escalates to a warning/ban instead of silently no-oping.
-                if (targetType is not (ReportTargetType.Post or ReportTargetType.Message))
+                if (targetType is not (ReportTargetType.Post or ReportTargetType.Message or ReportTargetType.Media))
                     return ModerationErrors.ContentRemovalRequiresContent;
 
                 if (targetType == ReportTargetType.Post)
@@ -56,7 +58,7 @@ internal sealed class ModerationService(
                     auditTargetType = ReportTargetType.Post;
                     auditTargetId = post.Id;
                 }
-                else
+                else if (targetType == ReportTargetType.Message)
                 {
                     // Block-filter-free lookup: the message may be soft-deleted already, and a
                     // moderator still needs to see (and restore) what they actioned.
@@ -70,6 +72,21 @@ internal sealed class ModerationService(
 
                     auditTargetType = ReportTargetType.Message;
                     auditTargetId = message.Id;
+                }
+                else
+                {
+                    // Removing the media is what actually takes the image out of circulation:
+                    // posts and messages reference it, so soft-deleting the row drops it from
+                    // every variant lookup and the reader's MediaResponse stops resolving.
+                    var media = await mediaRepository.GetByIdForModerationAsync(targetId, cancellationToken);
+                    if (media is null)
+                        return ModerationErrors.TargetNotFound;
+
+                    if (media.DeletedAt is null)
+                        mediaRepository.StageSoftDelete(media);
+
+                    auditTargetType = ReportTargetType.Media;
+                    auditTargetId = media.Id;
                 }
 
                 break;
@@ -138,9 +155,17 @@ internal sealed class ModerationService(
 
         // Content targets → the action lands on whoever wrote the content, so a suspension for
         // an abusive DM reaches the sender and not the conversation.
-        var authorId = targetType == ReportTargetType.Post
-            ? (await postRepository.GetByIdForModerationAsync(targetId, cancellationToken))?.AuthorId
-            : (await messagingRepository.GetMessageForModerationAsync(targetId, cancellationToken))?.SenderId;
+        var authorId = targetType switch
+        {
+            ReportTargetType.Post =>
+                (await postRepository.GetByIdForModerationAsync(targetId, cancellationToken))?.AuthorId,
+            ReportTargetType.Message =>
+                (await messagingRepository.GetMessageForModerationAsync(targetId, cancellationToken))?.SenderId,
+            ReportTargetType.Media =>
+                // The uploader, who may not be whoever published the post it ended up in.
+                (await mediaRepository.GetByIdForModerationAsync(targetId, cancellationToken))?.UploaderId,
+            _ => null
+        };
 
         return authorId is { } id
             ? await userRepository.GetByIdIgnoringBlocksAsync(id, cancellationToken)
