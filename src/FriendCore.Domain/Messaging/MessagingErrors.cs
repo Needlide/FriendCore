@@ -27,4 +27,18 @@ public static class MessagingErrors
     public static Error MessageTooLong =>
         Error.Validation("Messaging.MessageTooLong",
             $"Message must not exceed {Message.MaxContentLength} characters.");
+
+    // 404: the message is not in this conversation, or was soft-deleted (the global query
+    // filter makes it invisible), so both cases are indistinguishable to the caller.
+    public static Error MessageNotFound =>
+        Error.NotFound("Messaging.MessageNotFound", "Message was not found.");
+
+    public static Error NotMessageSender =>
+        Error.Forbidden("Messaging.NotMessageSender", "You can only modify your own messages.");
+
+    // An attachment-only message has no Content to rewrite. Rather than silently letting a
+    // caption be added after the fact, the whole edit is refused.
+    public static Error MessageNotEditable =>
+        Error.Validation("Messaging.MessageNotEditable",
+            "Only the text of a message can be edited.");
 }

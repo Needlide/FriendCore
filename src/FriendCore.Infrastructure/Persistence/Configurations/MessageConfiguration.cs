@@ -46,6 +46,7 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(message => message.CreatedAt).HasColumnName("created_at");
         builder.Property(message => message.DeletedAt).HasColumnName("deleted_at");
+        builder.Property(message => message.EditedAt).HasColumnName("edited_at");
 
         // Id trails the sort columns so the keyset (ORDER BY created_at DESC, id DESC) is fully
         // index-ordered even across messages that share a created_at.

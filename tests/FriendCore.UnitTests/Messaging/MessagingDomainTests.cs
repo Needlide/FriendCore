@@ -133,4 +133,102 @@ public class MessagingDomainTests
         Assert.Equal(MessageStatus.Sent, result.Value.Status);
         Assert.False(result.Value.IsEncrypted);
     }
+
+    [Fact]
+    public void Message_Edit_ReplacesTextAndStampsEditedAt()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+
+        var result = message.Edit("  corrected  ", Now.AddMinutes(5));
+
+        Assert.False(result.IsError);
+        Assert.Equal("corrected", message.Content);
+        Assert.Equal(Now.AddMinutes(5), message.EditedAt);
+    }
+
+    [Fact]
+    public void Message_Edit_KeepsTheFirstEditTime_OnRepeatedEdits()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+
+        message.Edit("first", Now.AddMinutes(5));
+        message.Edit("second", Now.AddMinutes(9));
+
+        // "edited" is a fact about the message; letting it drift would make the marker lie
+        // about when the text actually last changed.
+        Assert.Equal("second", message.Content);
+        Assert.Equal(Now.AddMinutes(5), message.EditedAt);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Message_Edit_RejectsEmptyText(string content)
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+
+        var result = message.Edit(content, Now);
+
+        Assert.Equal("Messaging.MessageEmpty", result.FirstError.Code);
+        Assert.Equal("original", message.Content);
+        Assert.Null(message.EditedAt);
+    }
+
+    [Fact]
+    public void Message_Edit_RejectsTooLongText()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+
+        var result = message.Edit(new string('x', Message.MaxContentLength + 1), Now);
+
+        Assert.Equal("Messaging.MessageTooLong", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Message_Edit_RefusesAnAttachmentOnlyMessage()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), null, Now, Ulid.NewUlid()).Value;
+
+        var result = message.Edit("a caption I never typed", Now);
+
+        // Half-applying this would put words in the sender's mouth on a bubble they sent bare.
+        Assert.Equal("Messaging.MessageNotEditable", result.FirstError.Code);
+        Assert.Null(message.Content);
+    }
+
+    [Fact]
+    public void Message_Edit_RefusesADeletedMessage()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+        message.MarkDeleted(Now);
+
+        var result = message.Edit("resurrect me", Now.AddMinutes(1));
+
+        // The row is invisible to every query, so "success" here would be a lie.
+        Assert.Equal("Messaging.MessageNotFound", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Message_MarkDeleted_ScrubsTheText()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "something I regret", Now).Value;
+
+        message.MarkDeleted(Now);
+
+        Assert.Equal(Now, message.DeletedAt);
+        // The words must not survive in the row: the spec never fixes a retention window for
+        // soft-deleted content, so leaving the text for the sweeper is not a privacy guarantee.
+        Assert.Null(message.Content);
+    }
+
+    [Fact]
+    public void Message_MarkDeleted_IsIdempotent()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "original", Now).Value;
+
+        message.MarkDeleted(Now);
+        message.MarkDeleted(Now.AddMinutes(5));
+
+        Assert.Equal(Now, message.DeletedAt);
+    }
 }

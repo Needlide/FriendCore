@@ -21,4 +21,21 @@ public interface IRealtimeNotifier
         Ulid recipientId,
         MessageResponse message,
         CancellationToken cancellationToken = default);
+
+    // Push an edit to BOTH participants: the recipient's open thread shows the new text, and
+    // the sender's other devices (phone, another tab) would otherwise keep showing the old
+    // wording indefinitely, since MessageReceived never reaches them.
+    Task MessageEditedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        MessageResponse message,
+        CancellationToken cancellationToken = default);
+
+    // Same audience as an edit. Carries ids only — the content is already gone, and pushing
+    // a tombstone would tell the client more than a reconcile refetch would.
+    Task MessageDeletedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        string messageId,
+        CancellationToken cancellationToken = default);
 }

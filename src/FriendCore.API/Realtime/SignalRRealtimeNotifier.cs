@@ -50,4 +50,57 @@ public sealed class SignalRRealtimeNotifier(
             logger.LogError(ex, "Failed to push message to {RecipientId}", recipientId);
         }
     }
+
+    public async Task MessageEditedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        MessageResponse message,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await PushToParticipants(participantIds, MessagingHub.EditedMethod, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to push edit for conversation {ConversationId}", conversationId);
+        }
+    }
+
+    public async Task MessageDeletedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        string messageId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await PushToParticipants(
+                participantIds, MessagingHub.DeletedMethod, new MessageDeletedPayload(messageId), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to push delete for conversation {ConversationId}", conversationId);
+        }
+    }
+
+    // Both sides of a direct conversation, fanned out per user rather than as a group: the
+    // client joins no groups (§11.1), and a two-participant set makes a group a worse fit.
+    private Task PushToParticipants(
+        IEnumerable<Ulid> participantIds,
+        string method,
+        object payload,
+        CancellationToken cancellationToken)
+    {
+        var sends = participantIds
+            .Select(id => messagingHub.Clients
+                .User(id.ToString())
+                .SendAsync(method, payload, cancellationToken))
+            .ToArray();
+
+        return Task.WhenAll(sends);
+    }
 }
+
+/// <summary>Minimal delete signal: the client drops the id from its thread.</summary>
+public sealed record MessageDeletedPayload(string MessageId);

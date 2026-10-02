@@ -14,7 +14,8 @@ public sealed record MessageResponse(
     string? Content,
     string Status,
     DateTimeOffset CreatedAt,
-    MediaResponse? Media)
+    MediaResponse? Media,
+    DateTimeOffset? EditedAt = null)
 {
     public static MessageResponse Create(Message message, MediaResponse? media = null) =>
         new(
@@ -24,7 +25,8 @@ public sealed record MessageResponse(
             message.Content,
             message.Status.ToString(),
             message.CreatedAt,
-            media);
+            media,
+            message.EditedAt);
 }
 
 public sealed record MessageFeedResponse(IReadOnlyList<MessageResponse> Messages, string? NextCursor);

@@ -41,6 +41,45 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    // Tracked (no AsNoTracking): Edit() and MarkDeleted() mutate the loaded entity and
+    // SoftDeleteAsync/SaveChangesAsync flush it.
+    public Task<Message?> GetMessageAsync(
+        Ulid conversationId,
+        Ulid messageId,
+        CancellationToken cancellationToken = default)
+    {
+        return context.Messages.FirstOrDefaultAsync(
+            message => message.Id == messageId && message.ConversationId == conversationId,
+            cancellationToken);
+    }
+
+    public async Task SoftDeleteAsync(
+        Message message,
+        DateTimeOffset deletedAt,
+        CancellationToken cancellationToken = default)
+    {
+        // Deliberately not context.Messages.Remove(message): the interceptor would stamp
+        // DeletedAt and nothing else, leaving the text readable in the row. MarkDeleted is
+        // what scrubs it. The row itself is never hard-deleted here — §2.3 soft deletes.
+        message.MarkDeleted(deletedAt);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<Message?> GetMessageForModerationAsync(Ulid messageId, CancellationToken cancellationToken = default)
+    {
+        return context.Messages
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(message => message.Id == messageId, cancellationToken);
+    }
+
+    public void StageSoftDelete(Message message, DateTimeOffset deletedAt)
+    {
+        // No save here: the moderation audit write commits the removal alongside its log entry.
+        // Goes through MarkDeleted rather than context.Messages.Remove so the text is scrubbed
+        // on this path too — Remove alone would only stamp DeletedAt and leave the words behind.
+        message.MarkDeleted(deletedAt);
+    }
+
     public async Task<IReadOnlyList<Conversation>> GetConversationsForUserAsync(
         Ulid userId,
         int limit,
