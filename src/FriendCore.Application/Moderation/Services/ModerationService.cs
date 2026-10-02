@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Domain.Common;
+using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -11,6 +12,7 @@ internal sealed class ModerationService(
     ICurrentUserService currentUserService,
     IUserRepository userRepository,
     IPostRepository postRepository,
+    IMessagingRepository messagingRepository,
     IAdminAuditLogRepository auditLogRepository,
     IDateTimeProvider dateTimeProvider)
     : IModerationService
@@ -37,18 +39,39 @@ internal sealed class ModerationService(
         switch (action)
         {
             case ModerationActionType.ContentRemoval:
-                if (targetType != ReportTargetType.Post)
-                    return ModerationErrors.ContentRemovalRequiresPost;
+                // Removal acts on content. A User target has no content to remove, so the
+                // ladder escalates to a warning/ban instead of silently no-oping.
+                if (targetType is not (ReportTargetType.Post or ReportTargetType.Message))
+                    return ModerationErrors.ContentRemovalRequiresContent;
 
-                var post = await postRepository.GetByIdForModerationAsync(targetId, cancellationToken);
-                if (post is null)
-                    return ModerationErrors.TargetNotFound;
+                if (targetType == ReportTargetType.Post)
+                {
+                    var post = await postRepository.GetByIdForModerationAsync(targetId, cancellationToken);
+                    if (post is null)
+                        return ModerationErrors.TargetNotFound;
 
-                if (post.DeletedAt is null)
-                    postRepository.StageSoftDelete(post);
+                    if (post.DeletedAt is null)
+                        postRepository.StageSoftDelete(post);
 
-                auditTargetType = ReportTargetType.Post;
-                auditTargetId = post.Id;
+                    auditTargetType = ReportTargetType.Post;
+                    auditTargetId = post.Id;
+                }
+                else
+                {
+                    // Block-filter-free lookup: the message may be soft-deleted already, and a
+                    // moderator still needs to see (and restore) what they actioned.
+                    var message = await messagingRepository.GetMessageForModerationAsync(
+                        targetId, cancellationToken);
+                    if (message is null)
+                        return ModerationErrors.TargetNotFound;
+
+                    if (message.DeletedAt is null)
+                        messagingRepository.StageSoftDelete(message, now);
+
+                    auditTargetType = ReportTargetType.Message;
+                    auditTargetId = message.Id;
+                }
+
                 break;
 
             case ModerationActionType.TemporarySuspension:
@@ -113,10 +136,14 @@ internal sealed class ModerationService(
         if (targetType == ReportTargetType.User)
             return await userRepository.GetByIdIgnoringBlocksAsync(targetId, cancellationToken);
 
-        // Post target → the action lands on the post's author.
-        var post = await postRepository.GetByIdForModerationAsync(targetId, cancellationToken);
-        return post is null
-            ? null
-            : await userRepository.GetByIdIgnoringBlocksAsync(post.AuthorId, cancellationToken);
+        // Content targets → the action lands on whoever wrote the content, so a suspension for
+        // an abusive DM reaches the sender and not the conversation.
+        var authorId = targetType == ReportTargetType.Post
+            ? (await postRepository.GetByIdForModerationAsync(targetId, cancellationToken))?.AuthorId
+            : (await messagingRepository.GetMessageForModerationAsync(targetId, cancellationToken))?.SenderId;
+
+        return authorId is { } id
+            ? await userRepository.GetByIdIgnoringBlocksAsync(id, cancellationToken)
+            : null;
     }
 }

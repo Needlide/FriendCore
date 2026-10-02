@@ -4,9 +4,11 @@ namespace FriendCore.Domain.Moderation;
 
 public static class ModerationErrors
 {
-    public static Error ContentRemovalRequiresPost =>
-        Error.Validation("Moderation.ContentRemovalRequiresPost",
-            "Content removal can only be applied to a post report.");
+    // Removal acts on content, never on a person. Post and Message are the content targets;
+    // a User target has no content to remove, so the ladder escalates to a warning or ban.
+    public static Error ContentRemovalRequiresContent =>
+        Error.Validation("Moderation.ContentRemovalRequiresContent",
+            "Content removal can only be applied to a post or message report.");
 
     public static Error ActionRequiresUser =>
         Error.Validation("Moderation.ActionRequiresUser",

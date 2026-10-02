@@ -1,5 +1,6 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Services;
+using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -15,6 +16,7 @@ public class ModerationServiceTests
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
+    private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
     private readonly IAdminAuditLogRepository _auditLogRepository = Substitute.For<IAdminAuditLogRepository>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _moderatorId = Ulid.NewUlid();
@@ -27,7 +29,8 @@ public class ModerationServiceTests
     }
 
     private ModerationService CreateService() =>
-        new(_currentUserService, _userRepository, _postRepository, _auditLogRepository, _dateTimeProvider);
+        new(_currentUserService, _userRepository, _postRepository, _messagingRepository,
+            _auditLogRepository, _dateTimeProvider);
 
     private static Report PostReport(Ulid postId) =>
         Report.Create(Ulid.NewUlid(), ReportTargetType.Post, postId, ReportCategory.Spam, null, Now).Value;
@@ -66,7 +69,7 @@ public class ModerationServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsError);
-        Assert.Equal("Moderation.ContentRemovalRequiresPost", result.FirstError.Code);
+        Assert.Equal("Moderation.ContentRemovalRequiresContent", result.FirstError.Code);
         await _auditLogRepository.DidNotReceiveWithAnyArgs().AddAndSaveAsync(default!, default);
     }
 
@@ -159,5 +162,64 @@ public class ModerationServiceTests
         Assert.Equal("Report.AlreadyResolved", result.FirstError.Code);
         // Enforcement was staged on the tracked entity but never committed (no save).
         await _auditLogRepository.DidNotReceiveWithAnyArgs().AddAndSaveAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task ContentRemoval_OnMessageTarget_StagesTheSoftDelete_AndLogsAgainstTheMessage()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "abusive", Now).Value;
+        var report = Report.Create(
+            Ulid.NewUlid(), ReportTargetType.Message, message.Id, ReportCategory.Harassment, null, Now).Value;
+        _messagingRepository.GetMessageForModerationAsync(message.Id, Arg.Any<CancellationToken>())
+            .Returns(message);
+
+        var result = await CreateService().ExecuteAsync(
+            ModerationActionType.ContentRemoval, ReportTargetType.Message, message.Id, "rule 1", null, report,
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        // The removal and the audit entry commit in one SaveChanges (§10.3).
+        _messagingRepository.Received(1).StageSoftDelete(message, Now);
+        Assert.Equal(ReportStatus.Resolved, report.Status);
+        await _auditLogRepository.Received(1).AddAndSaveAsync(
+            Arg.Is<AdminAuditLog>(e =>
+                e.Action == ModerationActionType.ContentRemoval
+                && e.TargetType == ReportTargetType.Message
+                && e.TargetId == message.Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ContentRemoval_OnMessageTarget_ReturnsTargetNotFound_WhenTheMessageIsGone()
+    {
+        _messagingRepository.GetMessageForModerationAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
+            .Returns((Message?)null);
+
+        var result = await CreateService().ExecuteAsync(
+            ModerationActionType.ContentRemoval, ReportTargetType.Message, Ulid.NewUlid(), "x", null, null,
+            CancellationToken.None);
+
+        Assert.Equal("Moderation.TargetNotFound", result.FirstError.Code);
+        await _auditLogRepository.DidNotReceiveWithAnyArgs().AddAndSaveAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Suspension_OnMessageReport_SuspendsTheSender_NotTheReporter()
+    {
+        var sender = UserTestFactory.Create(username: "sender");
+        var message = Message.Create(Ulid.NewUlid(), sender.Id, "abusive", Now).Value;
+        _messagingRepository.GetMessageForModerationAsync(message.Id, Arg.Any<CancellationToken>())
+            .Returns(message);
+        _userRepository.GetByIdIgnoringBlocksAsync(sender.Id, Arg.Any<CancellationToken>()).Returns(sender);
+
+        var result = await CreateService().ExecuteAsync(
+            ModerationActionType.TemporarySuspension, ReportTargetType.Message, message.Id, "abuse", 7, null,
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        // The action lands on whoever wrote the message — a suspension must not touch the person
+        // who reported it, nor fail because the target is a message rather than a post.
+        Assert.NotNull(sender.SuspendedUntil);
+        Assert.Equal(Now.AddDays(7), sender.SuspendedUntil);
     }
 }
