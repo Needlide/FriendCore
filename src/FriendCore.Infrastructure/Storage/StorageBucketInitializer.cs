@@ -39,16 +39,45 @@ internal sealed class StorageBucketInitializer(
             // Already provisioned — the normal case after first startup.
         }
 
-        // Media variants are served straight to browsers (never proxied through the API),
-        // so the bucket needs public read. Dev/test only: this initializer never runs in
-        // production (EnsureBucketExists off), where buckets are provisioned with proper policy.
+        // Media variants are served straight to browsers (never proxied through the API), so the
+        // bucket needs public read — but ONLY on the variants prefix.
+        //
+        // Scoping to the whole bucket (bucket/*) silently defeats §7.3. Originals live in the
+        // SAME bucket at uploads/originals/, and a bucket-wide policy makes every original
+        // anonymously fetchable with no signature, making the 15-minute presigned control purely
+        // decorative. Verified against dev: an unauthenticated GET of an original returned 200
+        // and the full file while the policy read bucket/*.
+        //
+        // Presigned URLs are unaffected by this policy — a presigned request is authorized by its
+        // own signature using the API credentials' permissions, not by the bucket policy — so the
+        // planned "Download original" flow (§7.3) keeps working once it is built.
+        //
+        // Prod buckets must be provisioned with this same prefix-scoped policy. See the storage
+        // section of docs/claude.md; there is no IaC in this repo, so it is a manual step and the
+        // easiest thing to get wrong.
         var policy = $$"""
-            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::{{storage.Bucket}}/*"] }]}
+            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::{{storage.Bucket}}/uploads/variants/*"] }]}
             """;
-        await client.PutBucketPolicyAsync(
-            new PutBucketPolicyRequest { BucketName = storage.Bucket, Policy = policy },
-            cancellationToken);
-        logger.LogInformation("Applied public-read policy to storage bucket {Bucket}", storage.Bucket);
+
+        try
+        {
+            await client.PutBucketPolicyAsync(
+                new PutBucketPolicyRequest { BucketName = storage.Bucket, Policy = policy },
+                cancellationToken);
+            logger.LogInformation(
+                "Applied public-read policy to {Bucket}/uploads/variants/* (originals excluded)", storage.Bucket);
+        }
+        catch (AmazonS3Exception e) when (e.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            // Fail soft. This used to propagate: a credential without bucket-management rights
+            // (exactly the prod posture the class comment describes) would crash the host at
+            // startup. Losing the policy write should never be a reason the API will not boot.
+            logger.LogWarning(
+                e,
+                "Could not apply the storage bucket policy — the credentials lack bucket-management " +
+                "permissions. Expected in production, where the bucket is provisioned ahead of time. " +
+                "Verify manually that public read is scoped to uploads/variants/* and NOT the whole bucket.");
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
