@@ -86,6 +86,30 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<MediaAttachment> GetAttachmentAsync(
+        Ulid mediaId,
+        CancellationToken cancellationToken = default)
+    {
+        // Post first: a media item is attachable exactly once, so at most one of these can hit.
+        var postId = await context.PostMedia
+            .Where(link => link.MediaItemId == mediaId)
+            .Select(link => link.PostId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (postId != Ulid.Empty)
+            return new MediaAttachment(postId, null, null);
+
+        // Message.MediaItemId is a nullable Ulid, which Npgsql cannot use in an ANY(...) array —
+        // the same trap documented on GetAttachedIdsAsync. Plain equality on a scalar avoids it.
+        var message = await context.Messages
+            .Where(m => m.MediaItemId == mediaId)
+            .Select(m => new { m.Id, m.ConversationId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return message is null
+            ? MediaAttachment.Unattached
+            : new MediaAttachment(null, message.Id, message.ConversationId);
+    }
+
     public Task<MediaItem?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default)
     {
         return context.MediaItems

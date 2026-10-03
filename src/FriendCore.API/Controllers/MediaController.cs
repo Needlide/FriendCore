@@ -2,6 +2,7 @@ using FriendCore.API.Contracts.Media;
 using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Extensions;
 using FriendCore.Application.Media.Commands.DeleteMedia;
+using FriendCore.Application.Media.Commands.RevealMedia;
 using FriendCore.Application.Media.Commands.UploadMedia;
 using FriendCore.Application.Media.Queries.GetMediaStatus;
 using FriendCore.Application.Moderation.Commands.ReportMedia;
@@ -73,6 +74,29 @@ public sealed class MediaController(ISender sender) : ControllerBase
 
         var result = await sender.Send(new DeleteMediaCommand(mediaId), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    /// <summary>
+    /// Consent step for §7.4: returns the variant URLs for a flagged image, having checked
+    /// that the caller would have been able to see it anyway.
+    ///
+    /// Flagged media appears in list responses with no URLs at all, so a client cannot render it
+    /// without coming through here. POST rather than GET deliberately — a GET invites browser
+    /// and proxy prefetch, which would hand out the JSON (and therefore the URL) before anyone
+    /// consented, quietly undoing the gate.
+    /// </summary>
+    [HttpPost("{id}/reveal")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Reveal(string id, CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var mediaId))
+            return NotFound();
+
+        var result = await sender.Send(new RevealMediaCommand(mediaId), cancellationToken);
+        return result.ToActionResult();
     }
 
     /// <summary>

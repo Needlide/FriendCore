@@ -18,11 +18,16 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
     private Task<(HttpClient Client, string Username)> RegisterClient() =>
         new AuthScenarios(factory).RegisterVerifiedClientAsync();
 
-    private static async Task<string> UploadReadyMedia(HttpClient client)
+    private static async Task<string> UploadReadyMedia(HttpClient client, bool flashing = false)
     {
         var file = new ByteArrayContent(TestImages.RealPng(200, 100));
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        var form = new MultipartFormDataContent { { file, "file", "image.png" } };
+        var form = new MultipartFormDataContent
+        {
+            { file, "file", "image.png" },
+            { new StringContent(flashing.ToString()), "HasFlashingWarning" },
+            { new StringContent("False"), "HasIntenseMotionWarning" }
+        };
 
         var response = await client.PostAsync("/api/v1/media", form);
         var body = await response.Content.ReadFromJsonAsync<MediaStatusResponse>();
@@ -215,5 +220,57 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
         var delete = await alice.DeleteAsync($"/api/v1/media/{mediaId}");
 
         Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
+    }
+
+    [Fact]
+    public async Task FlaggedAttachment_ArrivesWithNoVariants_AndTheRecipientCanRevealIt()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var mediaId = await UploadReadyMedia(alice, flashing: true);
+
+        var sent = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages", new { content = (string?)null, mediaId });
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+
+        // Bob's thread response hands him no URLs at all — the gate is server-side, so it does
+        // not matter which client renders the bubble.
+        var feed = await bob.GetFromJsonAsync<MessageFeedResponse>(
+            $"/api/v1/conversations/{conversation.Id}/messages");
+        var bubble = feed!.Messages.Single(m => m.Media?.Id == mediaId);
+        Assert.Empty(bubble.Media!.Variants);
+        Assert.True(bubble.Media.HasFlashingWarning);
+
+        // Consent, from a conversation participant, succeeds.
+        var reveal = await bob.PostAsync($"/api/v1/media/{mediaId}/reveal", content: null);
+        Assert.Equal(HttpStatusCode.OK, reveal.StatusCode);
+        var revealed = await reveal.Content.ReadFromJsonAsync<MediaVariantsResponse>();
+        Assert.NotEmpty(revealed!.Variants);
+    }
+
+    [Fact]
+    public async Task Outsider_CannotReveal_ADMImage_EvenWithTheMediaId()
+    {
+        // The case the whole reveal design exists for. A DM image is visible to participants
+        // only, and the media id alone must not be enough to unlock it.
+        var (alice, aliceName) = await RegisterClient();
+        var (bob, _) = await RegisterClient();
+        var (mallory, _) = await RegisterClient();
+        var (_, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var mediaId = await UploadReadyMedia(alice, flashing: true);
+
+        var sent = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages", new { content = (string?)null, mediaId });
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+
+        // Not a participant, and cannot read the thread either.
+        var reveal = await mallory.PostAsync($"/api/v1/media/{mediaId}/reveal", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, reveal.StatusCode);
+
+        var thread = await mallory.GetAsync($"/api/v1/conversations/{conversation.Id}/messages");
+        Assert.Equal(HttpStatusCode.NotFound, thread.StatusCode);
+        Assert.NotNull(aliceName);
     }
 }

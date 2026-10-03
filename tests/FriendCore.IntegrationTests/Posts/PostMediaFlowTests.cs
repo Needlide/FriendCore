@@ -17,11 +17,21 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         new AuthScenarios(factory).RegisterVerifiedClientAsync();
 
     /// <summary>Uploads a real image and waits until it is Ready; returns its id.</summary>
-    private static async Task<string> UploadReadyMedia(HttpClient client, int width = 200, int height = 100)
+    private static async Task<string> UploadReadyMedia(
+        HttpClient client,
+        int width = 200,
+        int height = 100,
+        bool flashing = false,
+        bool intenseMotion = false)
     {
         var file = new ByteArrayContent(TestImages.RealPng(width, height));
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        var form = new MultipartFormDataContent { { file, "file", "image.png" } };
+        var form = new MultipartFormDataContent
+        {
+            { file, "file", "image.png" },
+            { new StringContent(flashing.ToString()), "HasFlashingWarning" },
+            { new StringContent(intenseMotion.ToString()), "HasIntenseMotionWarning" }
+        };
 
         var response = await client.PostAsync("/api/v1/media", form);
         var body = await response.Content.ReadFromJsonAsync<MediaStatusResponse>();
@@ -168,5 +178,83 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
 
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
         Assert.Contains("Post.ContentOrMediaRequired", await created.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task FlaggedMedia_IsServedWithNoVariants_FromThePostResponse()
+    {
+        var (author, _) = await AuthedClient();
+        var flashing = await UploadReadyMedia(author, flashing: true);
+        var motion = await UploadReadyMedia(author, intenseMotion: true);
+        var plain = await UploadReadyMedia(author);
+
+        var response = await CreatePost(author, "mixed", flashing, motion, plain);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var post = await response.Content.ReadFromJsonAsync<PostResponse>();
+
+        var byId = post!.Media.ToDictionary(m => m.Id);
+
+        // The gate: no URLs at all, so the browser cannot be handed a location to fetch. The flags
+        // still ship, so the client can explain WHY there is no image.
+        Assert.Empty(byId[flashing].Variants);
+        Assert.Empty(byId[motion].Variants);
+        Assert.True(byId[flashing].HasFlashingWarning);
+        Assert.True(byId[motion].HasIntenseMotionWarning);
+
+        // Unflagged media is untouched — this must not have become a blanket change.
+        Assert.NotEmpty(byId[plain].Variants);
+    }
+
+    [Fact]
+    public async Task Reveal_HandsOverVariants_OnceTheReaderConsents()
+    {
+        var (author, _) = await AuthedClient();
+        var (reader, _) = await AuthedClient();
+        var flashing = await UploadReadyMedia(author, flashing: true);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await CreatePost(author, "look", flashing)).StatusCode);
+
+        var reveal = await reader.PostAsync($"/api/v1/media/{flashing}/reveal", content: null);
+        Assert.Equal(HttpStatusCode.OK, reveal.StatusCode);
+
+        var body = await reveal.Content.ReadFromJsonAsync<MediaVariantsResponse>();
+        Assert.Equal(flashing, body!.MediaId);
+        Assert.NotEmpty(body.Variants);
+        // Exactly the URLs the gated post response withheld — a reveal is a consent step for the
+        // same bytes, never a wider grant than an ungated post would have given.
+        Assert.DoesNotContain(body.Variants, v => v.Type == "Original");
+        Assert.All(body.Variants, v => Assert.StartsWith("http", v.Url));
+    }
+
+    [Fact]
+    public async Task Reveal_Succeeds_ForAnyReaderWhoCanSeeThePost()
+    {
+        // Posts are public, so "may this user see the media" is "may they see the post" — which
+        // for a post is everyone. Consent gates the flashing warning, it does not turn a public
+        // post into a private one; refusing here would break the ordinary reading path for
+        // readers who explicitly opted into seeing flagged media.
+        var (author, _) = await AuthedClient();
+        var (stranger, _) = await AuthedClient();
+        var flashing = await UploadReadyMedia(author, flashing: true);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await CreatePost(author, "look", flashing)).StatusCode);
+
+        var reveal = await stranger.PostAsync($"/api/v1/media/{flashing}/reveal", content: null);
+        Assert.Equal(HttpStatusCode.OK, reveal.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reveal_ReturnsNotFound_ForUnflaggedMediaAttachedToNothingVisible()
+    {
+        var (author, _) = await AuthedClient();
+        var (stranger, _) = await AuthedClient();
+        var plain = await UploadReadyMedia(author);
+
+        // Unflagged media is served inline anyway, so reveal is not the gate for it — it just
+        // works, which is why the ordinary path never needs the extra request.
+        var reveal = await stranger.PostAsync($"/api/v1/media/{plain}/reveal", content: null);
+        Assert.Equal(HttpStatusCode.OK, reveal.StatusCode);
     }
 }

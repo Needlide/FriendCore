@@ -32,6 +32,10 @@ public interface IMediaRepository
 
     Task SoftDeleteAsync(MediaItem media, CancellationToken cancellationToken = default);
 
+    // What this media is attached to, for authorizing a flagged-media reveal. Not covered by
+    // GetAttachedIdsAsync, which answers only "attached or not".
+    Task<MediaAttachment> GetAttachmentAsync(Ulid mediaId, CancellationToken cancellationToken = default);
+
     // Moderator view: soft-deleted rows included, so a moderator can see and act on media that
     // a previous action already removed.
     Task<MediaItem?> GetByIdForModerationAsync(Ulid id, CancellationToken cancellationToken = default);
