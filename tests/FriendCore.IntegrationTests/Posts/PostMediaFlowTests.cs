@@ -181,14 +181,13 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
     }
 
     [Fact]
-    public async Task FlaggedMedia_IsServedWithNoVariants_FromThePostResponse()
+    public async Task FlashingMedia_IsServedWithNoVariants_FromThePostResponse()
     {
         var (author, _) = await AuthedClient();
         var flashing = await UploadReadyMedia(author, flashing: true);
-        var motion = await UploadReadyMedia(author, intenseMotion: true);
         var plain = await UploadReadyMedia(author);
 
-        var response = await CreatePost(author, "mixed", flashing, motion, plain);
+        var response = await CreatePost(author, "mixed", flashing, plain);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var post = await response.Content.ReadFromJsonAsync<PostResponse>();
 
@@ -197,12 +196,33 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         // The gate: no URLs at all, so the browser cannot be handed a location to fetch. The flags
         // still ship, so the client can explain WHY there is no image.
         Assert.Empty(byId[flashing].Variants);
-        Assert.Empty(byId[motion].Variants);
         Assert.True(byId[flashing].HasFlashingWarning);
-        Assert.True(byId[motion].HasIntenseMotionWarning);
+        // The server names the hazard rather than leaving the client to re-derive it from the
+        // two booleans — that re-derivation is exactly what moving the gate here removed.
+        Assert.Equal("Flashing", byId[flashing].GateReason);
 
         // Unflagged media is untouched — this must not have become a blanket change.
         Assert.NotEmpty(byId[plain].Variants);
+        Assert.Null(byId[plain].GateReason);
+    }
+
+    [Fact]
+    public async Task IntenseMotionAlone_DoesNotGateAStillImage()
+    {
+        var (author, _) = await AuthedClient();
+        var motion = await UploadReadyMedia(author, intenseMotion: true);
+
+        var response = await CreatePost(author, "a jpeg", motion);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var post = await response.Content.ReadFromJsonAsync<PostResponse>();
+
+        var media = Assert.Single(post!.Media);
+        // A JPEG cannot contain movement — image/gif is the only animated format accepted (§7.1).
+        // Gating one for "intense motion" mis-filed a nuisance as a seizure hazard and left
+        // ReduceMotion with nothing to do. The flag is still recorded, just not acted on.
+        Assert.True(media.HasIntenseMotionWarning);
+        Assert.NotEmpty(media.Variants);
+        Assert.Null(media.GateReason);
     }
 
     [Fact]

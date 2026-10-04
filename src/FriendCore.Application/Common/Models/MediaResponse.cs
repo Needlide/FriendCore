@@ -10,6 +10,13 @@ public sealed record MediaVariantResponse(string Type, string Url, int WidthPx, 
 /// surface re-deriving the decision, and deriving <em>why</em> client-side would reintroduce
 /// exactly that.
 /// </summary>
+/// <remarks>
+///     The enum stays internal to the application layer; the wire value is a string, matching
+///     <see cref="MediaVariantResponse.Type" /> and <c>ReportResponse.Category</c> in the same
+///     payload family. <c>Program</c> registers <c>JsonStringEnumConverter</c>, so an enum-typed
+///     property here would go out as a string that a default <c>ReadFromJsonAsync</c> cannot
+///     read back — which is exactly how this first attempt broke the integration suite.
+/// </remarks>
 public enum MediaGateReason
 {
     /// <summary>Not gated. The variants, if any, are in the payload.</summary>
@@ -53,7 +60,7 @@ public sealed record MediaResponse(
     bool HasFlashingWarning,
     bool HasIntenseMotionWarning,
     IReadOnlyList<MediaVariantResponse> Variants,
-    MediaGateReason GateReason = MediaGateReason.None)
+    string? GateReason = null)
 {
     /// <summary>
     /// Builds a media payload for a list response, applying the flagged-media gate.
@@ -77,7 +84,7 @@ public sealed record MediaResponse(
                 media.HasFlashingWarning,
                 media.HasIntenseMotionWarning,
                 [],
-                reason);
+                reason.ToString());
 
         var variants = media.Variants
             .Where(variant => variant.Type != MediaVariantType.Original)
@@ -94,7 +101,9 @@ public sealed record MediaResponse(
             media.HasFlashingWarning,
             media.HasIntenseMotionWarning,
             variants,
-            reason);
+            // Null rather than "None": absence is the common case and null is the honest
+            // representation of it, so a client can test `gateReason` for truthiness.
+            reason == MediaGateReason.None ? null : reason.ToString());
     }
 
     /// <summary>

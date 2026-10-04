@@ -50,10 +50,11 @@ internal sealed class RevealMediaCommandHandler(
         if (!await MaySeeAsync(media, userId, cancellationToken))
             return MediaErrors.NotFound;
 
+        var reason = MediaResponse.GateReasonFor(media);
         return new MediaVariantsResponse(
             media.Id.ToString(),
             MediaResponse.Create(media, _publicBaseUrl, includeVariants: true).Variants,
-            MediaResponse.GateReasonFor(media));
+            GateReason: reason == MediaGateReason.None ? null : reason.ToString());
     }
 
     private async Task<bool> MaySeeAsync(MediaItem media, Ulid userId, CancellationToken cancellationToken)

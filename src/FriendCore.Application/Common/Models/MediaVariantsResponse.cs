@@ -12,4 +12,4 @@ namespace FriendCore.Application.Common.Models;
 public sealed record MediaVariantsResponse(
     string MediaId,
     IReadOnlyList<MediaVariantResponse> Variants,
-    MediaGateReason GateReason = MediaGateReason.None);
+    string? GateReason = null);

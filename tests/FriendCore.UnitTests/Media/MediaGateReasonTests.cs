@@ -58,11 +58,12 @@ public class MediaGateReasonTests
     public void GateReasonTravelsWithTheGatedResponse_SoTheClientDoesNotReDeriveIt()
     {
         var gated = MediaResponse.Create(Media("image/gif", false, true), "https://cdn");
-        Assert.Equal(MediaGateReason.IntenseMotion, gated.GateReason);
+        Assert.Equal("IntenseMotion", gated.GateReason);
         Assert.Empty(gated.Variants);
 
         var ungated = MediaResponse.Create(Media("image/png", false, false), "https://cdn");
-        Assert.Equal(MediaGateReason.None, ungated.GateReason);
+        // Null, not "None": absence is the common case and reads as falsy on the client.
+        Assert.Null(ungated.GateReason);
         Assert.NotEmpty(ungated.Variants);
     }
 
@@ -73,6 +74,6 @@ public class MediaGateReasonTests
         var granted = MediaResponse.Create(media, "https://cdn", includeVariants: true);
         Assert.NotEmpty(granted.Variants);
         // The reason survives so the client can keep explaining what the reader agreed to.
-        Assert.Equal(MediaGateReason.FlashingAndIntenseMotion, granted.GateReason);
+        Assert.Equal("FlashingAndIntenseMotion", granted.GateReason);
     }
 }
