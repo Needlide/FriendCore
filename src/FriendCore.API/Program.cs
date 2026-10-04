@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Microsoft.Extensions.FileProviders;
 
 const string FrontendCorsPolicy = "frontend";
 
@@ -183,12 +184,51 @@ try
         await next();
     });
 
-    app.UseSerilogRequestLogging();
+    // Logs the client IP on every request. Not decoration: the rate limiter partitions on exactly
+    // this value (RateLimitingExtensions.GetPartitionKey), so when beta limits look wrong — "why
+    // am I getting 429s", "are these testers sharing a bucket?" — the log is the only place the
+    // answer is visible. Serilog's default template omits it entirely.
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            diagnosticContext.Set("RequestIp", httpContext.Connection.RemoteIpAddress?.ToString());
+        options.MessageTemplate =
+            "HTTP {RequestMethod} {RequestPath} from {RequestIp} responded {StatusCode} in {Elapsed:0.0000} ms";
+    });
 
     if (app.Environment.IsDevelopment())
         app.MapOpenApi();
 
     app.UseHttpsRedirection();
+
+    // Same-origin hosting for the built SPA (opt-in via Spa:Path). When the API serves the
+    // client, apiBaseUrl resolves to the page's own origin, so one build works from a LAN IP,
+    // a WireGuard address or a hostname — and there is no cross-origin request at all, which
+    // removes the Cors:AllowedOrigins and ForwardedHeaders:KnownProxies traps from a
+    // laptop-hosted beta.
+    //
+    // Deliberately NOT mapped in Development: there ng serve owns the SPA, and falling back to
+    // index.html would swallow 404s that should stay 404s.
+    string? spaFiles = null;
+    var spaPath = app.Configuration["Spa:Path"];
+    if (!string.IsNullOrWhiteSpace(spaPath))
+    {
+        var candidate = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, spaPath));
+        if (Directory.Exists(candidate))
+        {
+            spaFiles = candidate;
+            // DefaultFiles answers "/" with index.html; StaticFiles serves the hashed bundles.
+            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = new PhysicalFileProvider(spaFiles) });
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(spaFiles) });
+            Log.Information("Serving SPA from {SpaPath}", spaFiles);
+        }
+        else
+        {
+            Log.Warning("Spa:Path is set to {SpaPath} but no such directory exists under {ContentRoot}",
+                spaPath, app.Environment.ContentRootPath);
+        }
+    }
+
     app.UseCors(FrontendCorsPolicy);
 
     // §10.3: 404 the admin surface for non-allowlisted IPs (after forwarded headers; no-op if
@@ -226,7 +266,33 @@ try
     app.MapHub<NotificationHub>("/hubs/notifications");
     app.MapHub<MessagingHub>("/hubs/messaging");
 
-    app.MapGet("/", () => Results.Ok(new { name = "FriendCore API", status = "running" }));
+    if (spaFiles is null)
+    {
+        app.MapGet("/", () => Results.Ok(new { name = "FriendCore API", status = "running" }));
+    }
+    else
+    {
+        // SPA history fallback, written out rather than MapFallbackToFile for two reasons:
+        // that overload resolves against the default webroot provider (not ours), and it would
+        // swallow genuine 404s under /api and /hubs — a wrong conversation id would start
+        // returning HTML, and the client would try to parse it as JSON.
+        var indexHtml = Path.Combine(spaFiles, "index.html");
+        app.MapFallback(async context =>
+        {
+            var path = context.Request.Path.Value ?? "/";
+            if (!HttpMethods.IsGet(context.Request.Method)
+                || path.StartsWith("/api", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/hubs", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/health", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.SendFileAsync(indexHtml);
+        });
+    }
 
     app.Run();
 }

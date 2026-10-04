@@ -27,9 +27,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot: RustFS runs as uid 10001, but Docker creates a fresh named volume owned by
+  # root — so a clean machine gets "Io error: Permission denied (os error 13)" and the media
+  # service never starts. Chown the volume before RustFS does, or every fresh clone and every
+  # new host hits this. Runs as root deliberately; it has no other job.
+  minio-init:
+    image: alpine:3
+    user: root
+    command: chown -R 10001:10001 /data
+    volumes:
+      - friendcore_minio_data:/data
+    restart: "no"
+
   minio:
     image: rustfs/rustfs:1.0.0
     container_name: friendcore-minio
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     environment:
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: 0.0.0.0:9000
