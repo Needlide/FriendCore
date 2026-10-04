@@ -52,7 +52,8 @@ internal sealed class RevealMediaCommandHandler(
 
         return new MediaVariantsResponse(
             media.Id.ToString(),
-            MediaResponse.Create(media, _publicBaseUrl, includeVariants: true).Variants);
+            MediaResponse.Create(media, _publicBaseUrl, includeVariants: true).Variants,
+            MediaResponse.GateReasonFor(media));
     }
 
     private async Task<bool> MaySeeAsync(MediaItem media, Ulid userId, CancellationToken cancellationToken)

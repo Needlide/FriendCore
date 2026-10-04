@@ -5,6 +5,27 @@ namespace FriendCore.Application.Common.Models;
 public sealed record MediaVariantResponse(string Type, string Url, int WidthPx, int HeightPx);
 
 /// <summary>
+/// Why the server withheld this media's URLs (§7.4). Sent instead of making the client work it
+/// out from the two booleans — the whole point of moving the gate server-side was to stop each
+/// surface re-deriving the decision, and deriving <em>why</em> client-side would reintroduce
+/// exactly that.
+/// </summary>
+public enum MediaGateReason
+{
+    /// <summary>Not gated. The variants, if any, are in the payload.</summary>
+    None = 0,
+
+    /// <summary>Photosensitivity risk. The serious one — a seizure hazard, not a nuisance.</summary>
+    Flashing = 1,
+
+    /// <summary>Vestibular discomfort from a lot of movement. Only meaningful for animated media.</summary>
+    IntenseMotion = 2,
+
+    /// <summary>Both apply.</summary>
+    FlashingAndIntenseMotion = 3
+}
+
+/// <summary>
 ///     One media item attached to a post or a message. Only the public WebP variants appear — the original is
 ///     served exclusively via presigned URL (spec §7.3).
 /// </summary>
@@ -31,7 +52,8 @@ public sealed record MediaResponse(
     string Id,
     bool HasFlashingWarning,
     bool HasIntenseMotionWarning,
-    IReadOnlyList<MediaVariantResponse> Variants)
+    IReadOnlyList<MediaVariantResponse> Variants,
+    MediaGateReason GateReason = MediaGateReason.None)
 {
     /// <summary>
     /// Builds a media payload for a list response, applying the flagged-media gate.
@@ -45,14 +67,17 @@ public sealed record MediaResponse(
     /// </summary>
     public static MediaResponse Create(MediaItem media, string? publicBaseUrl, bool includeVariants)
     {
+        var reason = GateReasonFor(media);
+
         // Everything else about the record stays the same, so a client can still tell the reader
         // *why* it is seeing no image.
-        if (!includeVariants && (media.HasFlashingWarning || media.HasIntenseMotionWarning))
+        if (!includeVariants && reason != MediaGateReason.None)
             return new MediaResponse(
                 media.Id.ToString(),
                 media.HasFlashingWarning,
                 media.HasIntenseMotionWarning,
-                []);
+                [],
+                reason);
 
         var variants = media.Variants
             .Where(variant => variant.Type != MediaVariantType.Original)
@@ -68,7 +93,41 @@ public sealed record MediaResponse(
             media.Id.ToString(),
             media.HasFlashingWarning,
             media.HasIntenseMotionWarning,
-            variants);
+            variants,
+            reason);
+    }
+
+    /// <summary>
+    /// Which hazard, if any, withholds this media.
+    /// </summary>
+    /// <remarks>
+    /// Intense motion counts ONLY for animated media. <c>image/gif</c> is the sole animated format
+    /// the API accepts (§7.1) — a JPEG, PNG or WebP still cannot contain movement, so the flag on a
+    /// still is noise and must not gate anything. This is what finally gives the second flag
+    /// meaning: previously both flags collapsed behind <c>HideFlashingMedia</c>, which mis-filed a
+    /// motion declaration as a seizure risk and left <c>ReduceMotion</c> with nothing to do.
+    /// <para>
+    /// Practical note: the single self-declaration checkbox sets BOTH flags, so in practice a
+    /// declared still is gated by the flashing branch anyway. The distinction shows up when a
+    /// report or a moderator sets only one — a flagged GIF for motion should gate, and a
+    /// motion-flagged JPEG should not.
+    /// </remarks>
+    internal static MediaGateReason GateReasonFor(MediaItem media)
+    {
+        var flashing = media.HasFlashingWarning;
+
+        // ContentType is the stored upload type, so this is the ORIGINAL's format. Animated GIFs
+        // keep that type; the derived variants are all WebP and would lose the distinction.
+        var animated = media.ContentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase);
+        var motion = media.HasIntenseMotionWarning && animated;
+
+        return (flashing, motion) switch
+        {
+            (true, true) => MediaGateReason.FlashingAndIntenseMotion,
+            (true, false) => MediaGateReason.Flashing,
+            (false, true) => MediaGateReason.IntenseMotion,
+            _ => MediaGateReason.None
+        };
     }
 
     /// <summary>
