@@ -144,18 +144,31 @@ public class BlockUserCommandHandlerTests
         await _blockRepository.DidNotReceiveWithAnyArgs().AddAndRemoveFollowsAsync(default!, default);
     }
 
+    /// <summary>
+    /// An admin may block an ordinary user. This used to be rejected with
+    /// User.CannotBlockAdmin, which left the single admin account on a small instance
+    /// unable to block anyone at all — and block is a personal-safety control, so on a
+    /// one-admin deployment the tester had no way to use it. Refusing to block an ADMIN
+    /// (the check above) is the part that protects the support channel; refusing to BE
+    /// an admin doing the blocking was not that protection, it was collateral.
+    /// </summary>
     [Fact]
-    public async Task Handle_ReturnsCannotBlockAdmin_WhenActorIsAdmin()
+    public async Task Handle_AllowsAdminToBlockAnOrdinaryUser()
     {
         var admin = UserTestFactory.Create(username: "moderator", email: "mod@example.com");
         admin.AssignRole(UserRole.Admin);
         _currentUserService.UserId.Returns(admin.Id);
         _userRepository.GetByIdIgnoringBlocksAsync(admin.Id, Arg.Any<CancellationToken>()).Returns(admin);
 
+        var target = UserTestFactory.Create(username: "bob", email: "bob@example.com");
+        _userRepository.GetByUsernameSlugIgnoringBlocksAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(target);
+        _followRepository.ExistsBetweenAsync(Arg.Any<Ulid>(), Arg.Any<Ulid>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
         var result = await CreateHandler().Handle(new BlockUserCommand("bob", false), CancellationToken.None);
 
-        Assert.True(result.IsError);
-        Assert.Equal("User.CannotBlockAdmin", result.FirstError.Code);
-        await _blockRepository.DidNotReceiveWithAnyArgs().AddAndRemoveFollowsAsync(default!, default);
+        Assert.False(result.IsError);
+        await _blockRepository.ReceivedWithAnyArgs(1).AddAndRemoveFollowsAsync(default!, default);
     }
 }

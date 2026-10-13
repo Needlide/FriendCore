@@ -36,10 +36,6 @@ internal sealed class BlockUserCommandHandler(
         if (target.Role == UserRole.Admin)
             return UserErrors.CannotBlockAdmin;
 
-        var actor = await userRepository.GetByIdIgnoringBlocksAsync(userId, cancellationToken);
-        if (actor is not null && actor.Role == UserRole.Admin)
-            return UserErrors.CannotBlockAdmin;
-
         // Idempotent: re-blocking is a no-op (any follows were already severed by the first block).
         if (await blockRepository.ExistsAsync(userId, target.Id, cancellationToken))
             return Result.Success;
