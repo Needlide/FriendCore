@@ -32,4 +32,38 @@
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     </ItemGroup>
 
+    <!--
+      Three ImageSharp advisories are suppressed by URL rather than by a blanket
+      NoWarn, so a genuinely new advisory still fails the build. Re-check when
+      the package is next upgraded: 4.x fixes all three but requires a paid Six
+      Labors license, and 3.2.0 fixes none of them.
+
+      None of the three is reachable from FriendCore:
+
+        GHSA-j3p4-wp97-rph4  HistogramEqualization trusts an unvalidated
+                             luminance value. FriendCore never calls it; the only
+                             mutation applied is AutoOrient (ProcessMediaJob).
+
+        GHSA-j9gm-c75j-xc9q  TIFF CCITT T4 encoder writes past its output
+                             buffer. TIFF is not an accepted upload: only
+                             jpeg/png/webp/gif are (ImageContentTypes.cs), and
+                             uploads are validated against magic bytes rather
+                             than trusting the declared content type.
+
+        GHSA-jjfr-hcj7-qf5w  TIFF CCITT T6 encoder — same reachability argument
+                             as the T4 advisory.
+    -->
+    <ItemGroup>
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Same precedent as FriendCore.Application: the channel's bounding behaviour (does it
+             block, drop, or grow when full?) is the whole point of the change and is not reachable
+             through IMediaProcessingQueue. -->
+        <InternalsVisibleTo Include="FriendCore.UnitTests"/>
+    </ItemGroup>
+
 </Project>
