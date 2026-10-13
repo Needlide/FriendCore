@@ -386,3 +386,10 @@ __pycache__/
 .env
 .env.*
 *.pfx
+
+# Runtime secrets: the real api.env lives at ~/.config/friendcore/api.env,
+# outside the repo. These patterns exist so that a copy accidentally created in
+# the working tree can never be committed. deploy/api.env.example IS tracked.
+*.env
+!*.env.example
+api.env
