@@ -1,0 +1,55 @@
+# FriendCore beta ingress.
+#
+# Terminates TLS for the public beta URL and forwards to the API over the
+# WireGuard interface. The API already serves the built SPA, so this is a plain
+# reverse proxy — no static files, no rewrites.
+#
+# The API is reached at 10.7.0.3 (tunnel address) rather than 192.168.0.110 so
+# the path does not depend on the laptop staying on the LAN.
+#
+# NOTE: this hostname is public. Every Let's Encrypt certificate is published to
+# Certificate Transparency logs, so internet scanners found this URL seconds
+# after issuance and will keep finding it. Treat it as a public service, not as
+# a link you are distributing privately.
+
+my-little.jerkface.net {
+	# `route` forces explicit ordering, so the /health exception below cannot be
+	# reordered ahead of the catch-all proxy by Caddy's directive sorting.
+	route {
+		# /health is for internal monitoring only. Answering it publicly just
+		# confirms to a scanner that the service exists and is up. Restricted to
+		# private ranges and loopback; anything else gets a 404, so the path does
+		# not even reveal itself.
+		@health_private {
+			path /health
+			remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1/8 ::1
+		}
+		handle @health_private {
+			reverse_proxy 10.7.0.3:5024
+		}
+
+		handle /health {
+			respond 404
+		}
+
+		handle {
+			reverse_proxy 10.7.0.3:5024 {
+				# Set these rather than append, so a client-supplied
+				# X-Forwarded-For cannot chain itself into the address the rate
+				# limiter reads. That value is what partitions the buckets: if it
+				# were spoofable, a client could collapse every tester into one
+				# bucket, or exempt itself from its own limit.
+				header_up X-Real-IP {remote_host}
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Proto {scheme}
+			}
+		}
+	}
+
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/access.log
+		format json
+	}
+}
