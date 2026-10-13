@@ -10,6 +10,7 @@ public sealed record UpdatePreferencesCommand(
     bool ReduceMotion,
     bool DisableAutoplay,
     bool ReduceVisualNoise,
+    bool SendMessageOnEnter,
     UserContentPreference ContentPreference)
     : IRequest<ErrorOr<PreferencesResponse>>;
 

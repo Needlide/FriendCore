@@ -181,7 +181,7 @@ public class ModerationServiceTests
 
         Assert.False(result.IsError);
         // The removal and the audit entry commit in one SaveChanges (§10.3).
-        _messagingRepository.Received(1).StageSoftDelete(message, Now);
+        _messagingRepository.Received(1).StageSoftDeleteAsync(message, Now, MessageDeletionSource.Moderation, Arg.Any<CancellationToken>());
         Assert.Equal(ReportStatus.Resolved, report.Status);
         await _auditLogRepository.Received(1).AddAndSaveAsync(
             Arg.Is<AdminAuditLog>(e =>

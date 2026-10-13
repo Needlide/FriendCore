@@ -23,6 +23,20 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
     // originals are only ever served via short-lived presigned URLs.
     public string OriginalStorageKey { get; private set; } = null!;
 
+    /// <summary>
+    ///     Lowercase hex SHA-256 of the uploaded bytes as received. Null only for rows created before
+    ///     this column existed, which means "unknown" and must never be treated as a match.
+    /// </summary>
+    /// <remarks>
+    ///     Computed over the ORIGINAL — never a variant — and never accepted from the client, since
+    ///     a client-supplied hash is trivially forged and would defeat every use this column exists
+    ///     for. Nothing consumes it yet: it is the prerequisite for hash matching (CSAM), for
+    ///     consent-withdrawal on a deleted image, and for processed-variant reuse. All three need
+    ///     the column to exist before they are worth building, and it is far cheaper to add now
+    ///     than to retrofit once there are rows to backfill.
+    /// </remarks>
+    public string? ContentHash { get; private set; }
+
     public MediaStatus Status { get; private set; }
     public bool HasFlashingWarning { get; private set; }
     public bool HasIntenseMotionWarning { get; private set; }
@@ -43,7 +57,8 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
         string fileExtension,
         bool hasFlashingWarning,
         bool hasIntenseMotionWarning,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? contentHash = null)
     {
         var selfDeclared = hasFlashingWarning || hasIntenseMotionWarning;
         var id = Ulid.NewUlid();
@@ -58,7 +73,8 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
             HasFlashingWarning = hasFlashingWarning,
             HasIntenseMotionWarning = hasIntenseMotionWarning,
             SafetySource = selfDeclared ? MediaSafetySource.UserSelfMarked : MediaSafetySource.None,
-            SafetyFlaggedAt = selfDeclared ? createdAt : null
+            SafetyFlaggedAt = selfDeclared ? createdAt : null,
+            ContentHash = contentHash
         };
     }
 

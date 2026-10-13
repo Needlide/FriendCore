@@ -2,6 +2,7 @@ using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Commands.ReportMedia;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Moderation;
 using NSubstitute;
@@ -20,6 +21,7 @@ public class ReportMediaHandlerTests
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
     private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
     private readonly IReportRepository _reportRepository = Substitute.For<IReportRepository>();
+    private readonly ISubjectSnapshotFactory _snapshotFactory = Substitute.For<ISubjectSnapshotFactory>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
 
     private readonly Ulid _reporterId = Ulid.NewUlid();
@@ -37,7 +39,7 @@ public class ReportMediaHandlerTests
     }
 
     private ReportMediaCommandHandler Handler() =>
-        new(_currentUserService, _mediaRepository, _reportRepository, _dateTimeProvider);
+        new(_currentUserService, _mediaRepository, _reportRepository, _snapshotFactory, _dateTimeProvider);
 
     private Task<ErrorOr<Success>> Report(ReportCategoryInput category = ReportCategoryInput.FlashingLights) =>
         Handler().Handle(new ReportMediaCommand(_media.Id, category, "harmful"), CancellationToken.None);

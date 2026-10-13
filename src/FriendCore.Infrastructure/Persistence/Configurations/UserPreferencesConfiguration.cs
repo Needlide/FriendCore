@@ -22,6 +22,9 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
         builder.Property(preferences => preferences.ReduceMotion).HasColumnName("reduce_motion");
         builder.Property(preferences => preferences.DisableAutoplay).HasColumnName("disable_autoplay");
         builder.Property(preferences => preferences.ReduceVisualNoise).HasColumnName("reduce_visual_noise");
+        // Plain boolean, like its four siblings — no string conversion, no DB-level default.
+        // Existing rows get true from the migration so they keep today's Enter-to-send behaviour.
+        builder.Property(preferences => preferences.SendMessageOnEnter).HasColumnName("send_message_on_enter");
         // Maps to a Postgres text[] column; field access keeps the domain's IReadOnlyList intact.
         builder.Property(preferences => preferences.KeywordFilters)
             .HasColumnName("keyword_filters")

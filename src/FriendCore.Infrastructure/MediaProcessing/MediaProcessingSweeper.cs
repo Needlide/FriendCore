@@ -39,8 +39,11 @@ internal sealed class MediaProcessingSweeper(
                 var stuckIds = await repository.GetStuckProcessingIdsAsync(
                     stuckBefore, SweepBatchSize, stoppingToken);
 
+                // Awaited because the queue is bounded. The sweeper's own cancellation token is
+                // passed so a shutdown mid-drain does not leave it waiting for room that will
+                // never arrive; an item not re-enqueued this round is simply picked up next sweep.
                 foreach (var mediaId in stuckIds)
-                    queue.Enqueue(mediaId);
+                    await queue.EnqueueAsync(mediaId, stoppingToken);
 
                 if (stuckIds.Count > 0)
                     logger.LogInformation("Re-enqueued {Count} media items stuck in Processing", stuckIds.Count);

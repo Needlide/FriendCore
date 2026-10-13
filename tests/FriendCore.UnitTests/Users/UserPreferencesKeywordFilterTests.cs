@@ -97,4 +97,45 @@ public class UserPreferencesKeywordFilterTests
         Assert.False(result.IsError);
         Assert.Empty(preferences.KeywordFilters);
     }
+
+    [Fact]
+    public void CreateDefault_SendsOnEnter_SoNobodyIsSilentlyMovedOffIt()
+    {
+        // Existing rows get this from the migration's column DEFAULT, and new ones from here.
+        // Both must agree: a user who never expressed an opinion keeps the behaviour every
+        // messenger trains, rather than landing in the modifier mode they never asked for.
+        var preferences = UserPreferences.CreateDefault(Ulid.NewUlid(), Now);
+
+        Assert.True(preferences.SendMessageOnEnter);
+    }
+
+    [Fact]
+    public void UpdateComposer_TogglesTheSendKey()
+    {
+        var preferences = UserPreferences.CreateDefault(Ulid.NewUlid(), Now);
+
+        preferences.UpdateComposer(false, Now.AddMinutes(5));
+        Assert.False(preferences.SendMessageOnEnter);
+        Assert.Equal(Now.AddMinutes(5), preferences.UpdatedAt);
+
+        preferences.UpdateComposer(true, Now.AddMinutes(9));
+        Assert.True(preferences.SendMessageOnEnter);
+    }
+
+    [Fact]
+    public void UpdateComposer_DoesNotDisturbTheAccessibilityFlags()
+    {
+        // The two settings are stored together but describe different things; splitting the
+        // mutators keeps a future edit to one from silently clearing the other.
+        var preferences = UserPreferences.CreateDefault(Ulid.NewUlid(), Now);
+        preferences.UpdateAccessibility(false, true, false, true, Now);
+
+        preferences.UpdateComposer(false, Now.AddMinutes(1));
+
+        Assert.False(preferences.HideFlashingMedia);
+        Assert.True(preferences.ReduceMotion);
+        Assert.False(preferences.DisableAutoplay);
+        Assert.True(preferences.ReduceVisualNoise);
+        Assert.False(preferences.SendMessageOnEnter);
+    }
 }

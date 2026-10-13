@@ -2,6 +2,7 @@ using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Commands.ReportMessage;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Users;
@@ -17,6 +18,7 @@ public class ReportMessageHandlerTests
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
     private readonly IBlockRepository _blockRepository = Substitute.For<IBlockRepository>();
     private readonly IReportRepository _reportRepository = Substitute.For<IReportRepository>();
+    private readonly ISubjectSnapshotFactory _snapshotFactory = Substitute.For<ISubjectSnapshotFactory>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
 
     private readonly Ulid _reporterId = Ulid.NewUlid();
@@ -39,7 +41,7 @@ public class ReportMessageHandlerTests
     }
 
     private ReportMessageCommandHandler Handler() =>
-        new(_currentUserService, _messagingRepository, _blockRepository, _reportRepository, _dateTimeProvider);
+        new(_currentUserService, _messagingRepository, _blockRepository, _reportRepository, _snapshotFactory, _dateTimeProvider);
 
     private Task<ErrorOr<Success>> Report() =>
         Handler().Handle(

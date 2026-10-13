@@ -40,7 +40,11 @@ internal sealed class DeleteMessageCommandHandler(
         if (message.SenderId != userId)
             return MessagingErrors.NotMessageSender;
 
-        await messagingRepository.SoftDeleteAsync(message, dateTimeProvider.UtcNow, cancellationToken);
+        // Source is Sender: only the sender can delete their own message today, and withdrawing
+        // your own message is not anyone declining to receive anything — so this records no
+        // consent refusal. Recipient-delete, when it lands, passes Recipient instead.
+        await messagingRepository.SoftDeleteAsync(
+            message, dateTimeProvider.UtcNow, MessageDeletionSource.Sender, cancellationToken);
 
         // Both sides, unlike MessageReceived: the recipient's open thread must drop the bubble
         // too. Best-effort by contract, so this never fails the delete.

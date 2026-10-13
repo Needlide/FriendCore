@@ -28,6 +28,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -85,10 +90,38 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ContentHash");
+
                     b.HasIndex("UploaderId")
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("media_items", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Media.MediaRefusal", b =>
+                {
+                    b.Property<string>("RecipientId")
+                        .HasColumnType("text")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<string>("SenderId")
+                        .HasColumnType("text")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("RecipientId", "SenderId", "ContentHash");
+
+                    b.HasIndex("SenderId", "CreatedAt");
+
+                    b.ToTable("media_refusals", (string)null);
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Messaging.Conversation", b =>
@@ -101,11 +134,20 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DirectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("direct_key");
+
                     b.Property<DateTimeOffset>("LastMessageAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_message_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DirectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_conversations_direct_key")
+                        .HasFilter("direct_key IS NOT NULL");
 
                     b.HasIndex("LastMessageAt");
 
@@ -148,6 +190,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("media_item_id");
 
+                    b.Property<string>("ReplyToMessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("reply_to_message_id");
+
                     b.Property<string>("SenderId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -159,15 +205,71 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
+                    b.Property<int>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("version");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MediaItemId")
                         .HasFilter("media_item_id IS NOT NULL");
 
+                    b.HasIndex("ReplyToMessageId")
+                        .HasFilter("reply_to_message_id IS NOT NULL");
+
                     b.HasIndex("ConversationId", "CreatedAt", "Id")
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("messages", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.MessageHidden", b =>
+                {
+                    b.Property<string>("MessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("HiddenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_at");
+
+                    b.HasKey("MessageId", "UserId");
+
+                    b.HasIndex("UserId", "MessageId");
+
+                    b.ToTable("message_hidden", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.MessageReaction", b =>
+                {
+                    b.Property<string>("MessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Emoji")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("emoji");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("MessageId", "UserId", "Emoji");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("message_reactions", (string)null);
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Moderation.AdminAuditLog", b =>
@@ -330,6 +432,28 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
+
+                    b.Property<string>("SubjectAuthorId")
+                        .HasColumnType("text")
+                        .HasColumnName("subject_author_id");
+
+                    b.Property<string>("SubjectAuthorUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subject_author_username");
+
+                    b.Property<DateTimeOffset?>("SubjectCapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("subject_captured_at");
+
+                    b.Property<string>("SubjectContent")
+                        .HasColumnType("text")
+                        .HasColumnName("subject_content");
+
+                    b.Property<string>("SubjectKind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("subject_kind");
 
                     b.Property<string>("TargetId")
                         .IsRequired()
@@ -914,6 +1038,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.Property<bool>("ReduceVisualNoise")
                         .HasColumnType("boolean")
                         .HasColumnName("reduce_visual_noise");
+
+                    b.Property<bool>("SendMessageOnEnter")
+                        .HasColumnType("boolean")
+                        .HasColumnName("send_message_on_enter");
 
                     b.Property<DateTimeOffset?>("SnoozedUntilUtc")
                         .HasColumnType("timestamp with time zone")

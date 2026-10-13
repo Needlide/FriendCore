@@ -1,10 +1,13 @@
+using System.Security.Cryptography;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Media;
+using FriendCore.Infrastructure.Persistence;
 using FriendCore.IntegrationTests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FriendCore.IntegrationTests.Media;
@@ -124,5 +127,48 @@ public class MediaUploadFlowTests(FriendCoreApiFactory factory) : IClassFixture<
         var response = await otherUser.GetAsync($"/api/v1/media/{body!.Id}/status");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Upload_RecordsTheContentHash_OfTheRealBytesOnTheWire()
+    {
+        var client = await AuthedClient();
+        var pngBytes = TestImages.RealPng(24, 18);
+
+        var response = await client.PostAsync("/api/v1/media", Upload(pngBytes, "image/png"));
+        var uploaded = await response.Content.ReadFromJsonAsync<MediaStatusResponse>();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var media = await db.MediaItems.FirstAsync(m => m.Id == Ulid.Parse(uploaded!.Id));
+
+        // The hash is of what actually arrived, computed server-side. A hash taken from the client
+        // would be forgeable, so it is not exposed on the response at all — this reads the column.
+        var expected = Convert.ToHexString(SHA256.HashData(pngBytes)).ToLowerInvariant();
+        Assert.Equal(expected, media.ContentHash);
+    }
+
+    [Fact]
+    public async Task TwoUploadsOfTheSameFile_ShareAHash()
+    {
+        var client = await AuthedClient();
+        var pngBytes = TestImages.RealPng(24, 18);
+
+        var first = await client.PostAsync("/api/v1/media", Upload(pngBytes, "image/png"));
+        var second = await client.PostAsync("/api/v1/media", Upload(pngBytes, "image/png"));
+        var firstBody = await first.Content.ReadFromJsonAsync<MediaStatusResponse>();
+        var secondBody = await second.Content.ReadFromJsonAsync<MediaStatusResponse>();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var hashes = await db.MediaItems
+            .Where(m => m.Id == Ulid.Parse(firstBody!.Id) || m.Id == Ulid.Parse(secondBody!.Id))
+            .Select(m => m.ContentHash)
+            .ToListAsync();
+
+        // Distinct rows — dedup is deliberately NOT built, this column is only its prerequisite —
+        // but the two are recognisably the same file, which is the property a consumer will need.
+        Assert.Equal(2, hashes.Count);
+        Assert.Single(hashes.Distinct());
     }
 }

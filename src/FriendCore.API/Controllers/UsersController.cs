@@ -130,6 +130,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
                 request.ReduceMotion,
                 request.DisableAutoplay,
                 request.ReduceVisualNoise,
+                request.SendMessageOnEnter,
                 request.ContentPreference),
             cancellationToken);
 

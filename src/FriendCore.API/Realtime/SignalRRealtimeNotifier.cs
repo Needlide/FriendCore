@@ -84,6 +84,32 @@ public sealed class SignalRRealtimeNotifier(
         }
     }
 
+    public async Task MessageReactionChangedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        Ulid messageId,
+        ReactionResponse? reaction,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // A null reaction travels as a zero-count payload rather than null, so the client
+            // handles one shape: "count is 0" is the signal to drop the chip.
+            var payload = new MessageReactionChangedPayload(
+                messageId.ToString(),
+                reaction?.Emoji ?? string.Empty,
+                reaction?.Count ?? 0,
+                reaction?.Reacted ?? false);
+
+            await PushToParticipants(
+                participantIds, MessagingHub.ReactionChangedMethod, payload, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to push reaction change for conversation {ConversationId}", conversationId);
+        }
+    }
+
     // Both sides of a direct conversation, fanned out per user rather than as a group: the
     // client joins no groups (§11.1), and a two-participant set makes a group a worse fit.
     private Task PushToParticipants(
@@ -104,3 +130,14 @@ public sealed class SignalRRealtimeNotifier(
 
 /// <summary>Minimal delete signal: the client drops the id from its thread.</summary>
 public sealed record MessageDeletedPayload(string MessageId);
+
+/// <summary>
+///     One emoji's new state on one message. <see cref="Count" /> of 0 means the last holder
+///     released it and the client drops the chip — the same vanish-don't-tombstone shape a
+///     deleted message uses.
+/// </summary>
+public sealed record MessageReactionChangedPayload(
+    string MessageId,
+    string Emoji,
+    int Count,
+    bool Reacted);

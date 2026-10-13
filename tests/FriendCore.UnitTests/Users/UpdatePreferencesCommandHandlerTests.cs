@@ -33,7 +33,7 @@ public class UpdatePreferencesCommandHandlerTests
         _currentUserService.UserId.Returns((Ulid?)null);
 
         var result = await CreateHandler().Handle(
-            new UpdatePreferencesCommand(true, false, true, false, UserContentPreference.General),
+            new UpdatePreferencesCommand(true, false, true, false, true, UserContentPreference.General),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -49,6 +49,7 @@ public class UpdatePreferencesCommandHandlerTests
                 ReduceMotion: true,
                 DisableAutoplay: false,
                 ReduceVisualNoise: true,
+                SendMessageOnEnter: false,
                 UserContentPreference.Explicit),
             CancellationToken.None);
 
@@ -58,7 +59,36 @@ public class UpdatePreferencesCommandHandlerTests
         Assert.True(_preferences.ReduceMotion);
         Assert.False(_preferences.DisableAutoplay);
         Assert.True(_preferences.ReduceVisualNoise);
+        Assert.False(_preferences.SendMessageOnEnter);
         Assert.Equal("Explicit", result.Value.ContentPreference);
         await _userRepository.Received(1).UpdateAsync(_user, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_EchoesTheSendKeyBack_InTheResponse()
+    {
+        // The response is what the composer reads, so a preference that saved but did not come
+        // back would leave the composer disagreeing with the settings page until a reload.
+        var result = await CreateHandler().Handle(
+            new UpdatePreferencesCommand(true, false, true, false, false, UserContentPreference.General),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.False(result.Value.SendMessageOnEnter);
+    }
+
+    [Fact]
+    public async Task Handle_LeavesTheSendKeyAlone_WhenNotMentioned_BySendingTheCurrentValue()
+    {
+        // The endpoint is a full replace, so "not mentioned" cannot be distinguished from
+        // "false". These fixtures make the distinction visible rather than accidental.
+        _preferences.UpdateComposer(false, Now.AddDays(-1));
+
+        var result = await CreateHandler().Handle(
+            new UpdatePreferencesCommand(true, false, true, false, false, UserContentPreference.General),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.False(_preferences.SendMessageOnEnter);
     }
 }

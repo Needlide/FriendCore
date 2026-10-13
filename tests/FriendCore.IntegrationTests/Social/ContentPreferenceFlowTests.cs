@@ -31,6 +31,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
             reduceMotion = false,
             disableAutoplay = true,
             reduceVisualNoise = false,
+            sendMessageOnEnter = true,
             contentPreference = preference
         });
     }
@@ -130,5 +131,72 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         var response = await SetContentPreference(factory.CreateClient(), "Explicit");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SendMessageOnEnter_DefaultsToTrue_ForANewAccount()
+    {
+        var (client, _) = await RegisterClient();
+
+        var response = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+
+        // Not merely a domain default: the column DEFAULT covers rows that already existed
+        // when the migration ran, which is the population that would otherwise have been moved
+        // to Ctrl+Enter without ever being asked.
+        Assert.True(response!.SendMessageOnEnter);
+    }
+
+    [Fact]
+    public async Task SendMessageOnEnter_RoundTripsThroughThePreferencesEndpoint()
+    {
+        var (client, _) = await RegisterClient();
+
+        var patched = await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
+        {
+            hideFlashingMedia = true,
+            reduceMotion = false,
+            disableAutoplay = true,
+            reduceVisualNoise = false,
+            sendMessageOnEnter = false,
+            contentPreference = "General"
+        });
+        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+        Assert.False((await patched.Content.ReadFromJsonAsync<PreferencesResponse>())!.SendMessageOnEnter);
+
+        // Survives a fresh read, not just the PATCH echo.
+        var reread = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.False(reread!.SendMessageOnEnter);
+    }
+
+    [Fact]
+    public async Task SendMessageOnEnter_IsIndependentOfTheAccessibilityToggles()
+    {
+        var (client, _) = await RegisterClient();
+
+        await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
+        {
+            hideFlashingMedia = true,
+            reduceMotion = false,
+            disableAutoplay = true,
+            reduceVisualNoise = false,
+            sendMessageOnEnter = false,
+            contentPreference = "General"
+        });
+
+        // Turning the accessibility set off and back on must not quietly reset the send key:
+        // the two are stored in one row but describe different things.
+        await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
+        {
+            hideFlashingMedia = true,
+            reduceMotion = false,
+            disableAutoplay = true,
+            reduceVisualNoise = false,
+            sendMessageOnEnter = false,
+            contentPreference = "Explicit"
+        });
+
+        var body = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.False(body!.SendMessageOnEnter);
+        Assert.Equal("Explicit", body.ContentPreference);
     }
 }

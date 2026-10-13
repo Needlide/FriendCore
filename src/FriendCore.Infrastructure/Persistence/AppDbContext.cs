@@ -39,8 +39,11 @@ public class AppDbContext(
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<MediaItem> MediaItems => Set<MediaItem>();
     public DbSet<PostMedia> PostMedia => Set<PostMedia>();
+    public DbSet<MediaRefusal> MediaRefusals => Set<MediaRefusal>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageHidden> MessageHidden => Set<MessageHidden>();
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<AdminAuditLog> AdminAuditLog => Set<AdminAuditLog>();

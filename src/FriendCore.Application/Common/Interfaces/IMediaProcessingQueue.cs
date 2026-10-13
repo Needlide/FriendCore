@@ -7,5 +7,15 @@ namespace FriendCore.Application.Common.Interfaces;
 /// </summary>
 public interface IMediaProcessingQueue
 {
-    void Enqueue(Ulid mediaId);
+    /// <summary>
+    ///     Hands an item to the pipeline, waiting for room if the queue is full.
+    /// </summary>
+    /// <remarks>
+    ///     Awaited rather than fire-and-forget because the channel is bounded: an unbounded queue
+    ///     accepts work the processor cannot keep up with and never says so, which is how a
+    ///     "Processing" row becomes a mystery. Backpressure that surfaces as a slower upload beats
+    ///     a queue that grows without limit. Callers pass their cancellation token so a
+    ///     disconnected client releases the writer.
+    /// </remarks>
+    Task EnqueueAsync(Ulid mediaId, CancellationToken cancellationToken = default);
 }

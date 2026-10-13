@@ -67,8 +67,14 @@ internal sealed class ModerationService(
                     if (message is null)
                         return ModerationErrors.TargetNotFound;
 
+                    // Source is Moderation, not Sender: a moderator removing content is a
+                    // judgement about the image, so it records a consent refusal and the image
+                    // cannot come back between these two people. Had the sender's own withdrawal
+                    // done the same, an ordinary recall would have permanently barred them from
+                    // re-sharing that exact picture.
                     if (message.DeletedAt is null)
-                        messagingRepository.StageSoftDelete(message, now);
+                        await messagingRepository.StageSoftDeleteAsync(
+                            message, now, MessageDeletionSource.Moderation, cancellationToken);
 
                     auditTargetType = ReportTargetType.Message;
                     auditTargetId = message.Id;

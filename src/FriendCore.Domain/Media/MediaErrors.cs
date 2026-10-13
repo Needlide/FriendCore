@@ -27,6 +27,14 @@ public static class MediaErrors
     public static Error NotReady =>
         Error.Validation("Media.NotReady", "Media is still processing and cannot be attached yet.");
 
+    // 409, not 403 or 404. Not Forbidden: nothing about the SENDER is wrong. Not NotFound: the
+    // media and the conversation both exist, and hiding that would leave them retrying forever
+    // with no idea why. The copy has to explain itself, because from the sender's side this looks
+    // like the app broke.
+    public static Error RefusedByRecipient =>
+        Error.Conflict("Media.RefusedByRecipient",
+            "This image can't be sent to this conversation any more.");
+
     public static Error AlreadyAttached =>
         Error.Conflict("Media.AlreadyAttached", "Media is already attached to another post.");
 

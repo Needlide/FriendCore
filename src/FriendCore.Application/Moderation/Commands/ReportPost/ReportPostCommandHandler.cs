@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
@@ -12,6 +13,7 @@ internal sealed class ReportPostCommandHandler(
     ICurrentUserService currentUserService,
     IPostRepository postRepository,
     IReportRepository reportRepository,
+    ISubjectSnapshotFactory snapshotFactory,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<ReportPostCommand, ErrorOr<Success>>
 {
@@ -29,9 +31,17 @@ internal sealed class ReportPostCommandHandler(
         if (await reportRepository.PendingExistsAsync(userId, ReportTargetType.Post, post.Id, cancellationToken))
             return Result.Success;
 
+        // Captured here, while the subject still exists — at review time it may be
+
+        // gone, which is the whole problem this snapshot exists to solve.
+
+        var snapshot = await snapshotFactory.CaptureAsync(
+
+            ReportTargetType.Post, post.Id, cancellationToken);
+
         var report = Report.Create(
             userId, ReportTargetType.Post, post.Id, request.Category.ToDomain(), request.Note,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow, snapshot);
         if (report.IsError)
             return report.Errors;
 

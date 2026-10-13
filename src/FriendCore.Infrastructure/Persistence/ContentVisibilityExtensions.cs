@@ -27,10 +27,24 @@ internal static class ContentVisibilityExtensions
 
         // Keyword filters (§13.6): case-insensitive substring, applied before any page/limit cut.
         // Media-only posts (null content) can never match.
-        if (keywordFilters.Count > 0)
-            posts = posts.Where(post =>
-                post.Content == null
-                || !keywordFilters.Any(keyword => EF.Functions.ILike(post.Content!, "%" + keyword + "%")));
+        //
+        // Contains rather than a LIKE-ish helper, and one Where per keyword rather than an Any over
+        // the list: EF compiles Contains to `lower(content) LIKE @param` with the pattern bound and
+        // its LIKE metacharacters escaped, so a keyword containing % or _ is matched literally.
+        //
+        // This replaced EF.Functions.ILike, which was a real bug and not a style point. It compiles
+        // to `content ILIKE @term ESCAPE ''` — an EMPTY escape character — so "_" stayed a
+        // single-character wildcard and the keyword "snake_case" silently hid "snakeXcase".
+        // ProviderQuirkGuardTests fails the build if that helper comes back.
+        //
+        // Looping is equivalent to the Any it replaces: "no keyword matches" is the AND of each
+        // "this keyword does not match", and a closure over the loop variable would otherwise be
+        // captured incorrectly anyway.
+        foreach (var keyword in keywordFilters)
+        {
+            var needle = keyword.ToLowerInvariant();
+            posts = posts.Where(post => post.Content == null || !post.Content.ToLower().Contains(needle));
+        }
 
         // §9.1: explicit/sensitive content filtered by the viewer's ContentPreference. Enums are
         // stored as strings, where <= would compare alphabetically — hence an explicit IN-list.

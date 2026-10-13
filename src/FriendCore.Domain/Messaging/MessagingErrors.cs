@@ -30,6 +30,15 @@ public static class MessagingErrors
 
     // 404: the message is not in this conversation, or was soft-deleted (the global query
     // filter makes it invisible), so both cases are indistinguishable to the caller.
+    /// <summary>
+    ///     A search term too short to run. Its own code rather than an empty result, so the client
+    ///     can say why nothing came back instead of showing a bare "no matches".
+    /// </summary>
+    public static Error SearchTermTooShort =>
+        Error.Validation(
+            "Messaging.SearchTermTooShort",
+            "Type at least two characters to search.");
+
     public static Error MessageNotFound =>
         Error.NotFound("Messaging.MessageNotFound", "Message was not found.");
 
@@ -41,4 +50,23 @@ public static class MessagingErrors
     public static Error MessageNotEditable =>
         Error.Validation("Messaging.MessageNotEditable",
             "Only the text of a message can be edited.");
+
+    // 404: the message being replied to is in another conversation, or was soft-deleted. Same
+    // rule as editing a deleted message — replying to something that no longer exists would
+    // leave a quote with nothing in it.
+    public static Error ReplyTargetNotFound =>
+        Error.NotFound("Messaging.ReplyTargetNotFound", "The message you are replying to is gone.");
+
+    // Reactions come from a closed set (ReactionEmoji) — an unknown glyph is a client bug, not
+// a free-text value to store. Validation, hence 400.
+    public static Error ReactionNotAllowed =>
+        Error.Validation("Messaging.ReactionNotAllowed", "That is not a supported reaction.");
+
+    // 409, the only Conflict in the messaging module: the caller's view is out of date because
+    // the sender saved a different wording from another device. Distinct from a validation
+    // error — the text they sent may be perfectly fine, it is just no longer based on anything
+    // current, so re-sending it unchanged would silently discard the other save.
+    public static Error MessageChanged =>
+        Error.Conflict("Messaging.MessageChanged",
+            "This message was changed somewhere else. Reload it and try again.");
 }

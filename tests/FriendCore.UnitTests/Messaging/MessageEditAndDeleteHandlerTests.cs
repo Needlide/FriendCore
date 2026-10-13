@@ -30,6 +30,10 @@ public class MessageEditAndDeleteHandlerTests
     private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly MediaResponseFactory _mediaResponseFactory;
+    private readonly ReplyReferenceFactory _replyReferenceFactory;
+
+    /// <summary>The version the fixtures were loaded at; what a well-behaved client presents.</summary>
+    private const int Version = 0;
 
     private readonly Ulid _senderId = Ulid.NewUlid();
     private readonly Ulid _otherId = Ulid.NewUlid();
@@ -48,6 +52,7 @@ public class MessageEditAndDeleteHandlerTests
         _dateTimeProvider.UtcNow.Returns(Now);
         _mediaResponseFactory = new MediaResponseFactory(
             _mediaRepository, Options.Create(new StorageOptions()));
+        _replyReferenceFactory = new ReplyReferenceFactory(_messagingRepository);
 
         _conversation = Conversation.CreateDirect(_senderId, _otherId, Now).Value;
         _conversationId = _conversation.Id;
@@ -58,6 +63,18 @@ public class MessageEditAndDeleteHandlerTests
             .Returns(_conversation);
         _messagingRepository.GetMessageAsync(_conversationId, _messageId, Arg.Any<CancellationToken>())
             .Returns(_message);
+
+        // The edit lands through a compare-and-set rather than SaveChanges, so "it saved" is now
+        // this stub returning true. Left false here on purpose: a test that cares about reaching
+        // the write has to say so, instead of inheriting a silent conflict.
+        // Matches on any message id, not _messageId: several tests swap a different Message
+        // into GetMessageAsync (an attachment-only one, a captioned one), and keying the stub
+        // to the default fixture's id silently missed those — the write then reported a
+        // conflict and the test failed far away from its actual subject.
+        _messagingRepository.TryApplyEditAsync(
+                _conversationId, Arg.Any<Ulid>(), Arg.Any<string>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(true);
     }
 
     private DeleteMessageCommandHandler DeleteHandler() =>
@@ -65,11 +82,11 @@ public class MessageEditAndDeleteHandlerTests
 
     private EditMessageCommandHandler EditHandler() =>
         new(_currentUserService, _messagingRepository, _blockRepository, _mediaResponseFactory,
-            _realtimeNotifier, _dateTimeProvider);
+            _replyReferenceFactory, _realtimeNotifier, _dateTimeProvider);
 
     private Task<ErrorOr<MessageResponse>> Edit(string content) =>
         EditHandler().Handle(
-            new EditMessageCommand(_conversationId, _messageId, content), CancellationToken.None);
+            new EditMessageCommand(_conversationId, _messageId, content, Version), CancellationToken.None);
 
     [Fact]
     public async Task Delete_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -141,8 +158,10 @@ public class MessageEditAndDeleteHandlerTests
         // Scrubbing the text is the aggregate's job and is covered as a domain test; what the
         // handler owes is that it goes through the soft-delete path (never a hard delete) and
         // uses the injected clock rather than its own.
+        // Source matters as much as the timestamp: a sender's own withdrawal must NOT record a
+        // consent refusal, which would permanently stop them re-sharing that exact image later.
         await _messagingRepository.Received(1).SoftDeleteAsync(
-            _message, Now, Arg.Any<CancellationToken>());
+            _message, Now, MessageDeletionSource.Sender, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -175,7 +194,7 @@ public class MessageEditAndDeleteHandlerTests
     public async Task Edit_ReplacesTheTextAndStampsEditedAt()
     {
         var result = await EditHandler().Handle(
-            new EditMessageCommand(_conversationId, _messageId, "  corrected text  "), CancellationToken.None);
+            new EditMessageCommand(_conversationId, _messageId, "  corrected text  ", Version), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal("corrected text", _message.Content);
@@ -190,10 +209,90 @@ public class MessageEditAndDeleteHandlerTests
         await Edit("first correction");
         _dateTimeProvider.UtcNow.Returns(Later);
 
-        await Edit("second correction");
+        // Presents the version the first edit produced, which is what a real client has: it
+        // got the bumped version back in the response. Sending the original 0 here would be
+        // the stale case, covered by Edit_RefusesAStaleVersion.
+        await EditHandler().Handle(
+            new EditMessageCommand(_conversationId, _messageId, "second correction", _message.Version),
+            CancellationToken.None);
 
         Assert.Equal("second correction", _message.Content);
+        // First time, not the second — even though the second save is the later of the two.
         Assert.Equal(Now, _message.EditedAt);
+        Assert.Equal(2, _message.Version);
+    }
+
+    [Fact]
+    public async Task Edit_RefusesAStaleVersion()
+    {
+        _messagingRepository.TryApplyEditAsync(
+                Arg.Any<Ulid>(), Arg.Any<Ulid>(), Arg.Any<string>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        // The row moved on between this client loading it and pressing save.
+        var result = await EditHandler().Handle(
+            new EditMessageCommand(_conversationId, _messageId, "my reword", 7), CancellationToken.None);
+
+        Assert.Equal("Messaging.MessageChanged", result.FirstError.Code);
+    }
+
+    [Fact]
+    public async Task Edit_RefusesAStaleVersion_WithoutReachingTheWrite()
+    {
+        // The cheap comparison in the domain catches the ordinary case, before any SQL.
+        var result = await EditHandler().Handle(
+            new EditMessageCommand(_conversationId, _messageId, "my reword", 7), CancellationToken.None);
+
+        Assert.Equal("Messaging.MessageChanged", result.FirstError.Code);
+        await _messagingRepository.DidNotReceiveWithAnyArgs()
+            .TryApplyEditAsync(default!, default!, default!, default!, default!, default!);
+    }
+
+    [Fact]
+    public async Task Edit_ReportsTheConflict_WhenTheRowMovesBetweenLoadAndWrite()
+    {
+        // Loaded at version 0 and the check passes, then another device saves before this
+        // statement lands. Only the compare-and-set can see that, which is why it exists
+        // alongside the in-memory check rather than instead of it.
+        _messagingRepository.TryApplyEditAsync(
+                Arg.Any<Ulid>(), Arg.Any<Ulid>(), Arg.Any<string>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var result = await Edit("my reword");
+
+        Assert.Equal("Messaging.MessageChanged", result.FirstError.Code);
+    }
+
+    [Fact]
+    public async Task Edit_CarriesTheBumpedVersion_OntoTheResponseAndThePush()
+    {
+        var result = await Edit("first correction");
+
+        // The response is also the MessageEdited payload. If it did not carry the new version,
+        // the recipient's client would hold a stale one and 409 on its own next edit.
+        Assert.Equal(1, result.Value.Version);
+        await _realtimeNotifier.Received(1).MessageEditedAsync(
+            _conversationId, Arg.Any<IEnumerable<Ulid>>(),
+            Arg.Is<MessageResponse>(m => m.Version == 1),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_IsNeverGatedOnTheVersion()
+    {
+        // The asymmetry this whole design turns on: a delete is terminal, so it must not be
+        // blocked because the sender is mid-rewrite on another device. Delete never goes
+        // through the compare-and-set, so there is no version for it to lose.
+        _message.MarkEditCommitted();
+
+        var result = await DeleteHandler().Handle(
+            new DeleteMessageCommand(_conversationId, _messageId), CancellationToken.None);
+
+        Assert.False(result.IsError);
+        await _messagingRepository.DidNotReceiveWithAnyArgs()
+            .TryApplyEditAsync(default!, default!, default!, default!, default!, default!);
     }
 
     [Theory]
@@ -240,7 +339,7 @@ public class MessageEditAndDeleteHandlerTests
             .Returns(captioned);
 
         var result = await EditHandler().Handle(
-            new EditMessageCommand(_conversationId, _messageId, "look at this"), CancellationToken.None);
+            new EditMessageCommand(_conversationId, _messageId, "look at this", Version), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal("look at this", captioned.Content);

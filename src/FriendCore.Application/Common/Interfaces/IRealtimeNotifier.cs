@@ -38,4 +38,15 @@ public interface IRealtimeNotifier
         IEnumerable<Ulid> participantIds,
         string messageId,
         CancellationToken cancellationToken = default);
+
+    // A reaction was added or removed. Same audience as an edit: the person who tapped already
+    // has the response, but the other participant's open thread has to update the chip, and the
+    // tapper's other devices would otherwise be stale (MessageReceived never reaches them).
+    // A null reaction means nobody holds that emoji any more, and the client drops the chip.
+    Task MessageReactionChangedAsync(
+        Ulid conversationId,
+        IEnumerable<Ulid> participantIds,
+        Ulid messageId,
+        ReactionResponse? reaction,
+        CancellationToken cancellationToken = default);
 }

@@ -231,4 +231,85 @@ public class MessagingDomainTests
 
         Assert.Equal(Now, message.DeletedAt);
     }
+
+    [Fact]
+    public void Edit_StartsAtVersionZero_SoAnUneditedMessagePresentsZero()
+    {
+        // Not a cosmetic default: the client sends this back verbatim, so the value a fresh
+        // message carries is part of the contract.
+        Assert.Equal(0, Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value.Version);
+    }
+
+    [Fact]
+    public void Edit_AcceptsTheCurrentVersion_AndLeavesTheBumpToPersistence()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value;
+
+        var result = message.Edit("hello again", Now.AddMinutes(1), expectedVersion: 0);
+
+        Assert.True(result.IsSuccess);
+        // Edit does not bump it: the compare-and-set does, in SQL, atomically with the write.
+        // Bumping here too would let a rejected edit advance the version out from under the
+        // client that still holds the old one.
+        Assert.Equal(0, message.Version);
+
+        message.MarkEditCommitted();
+        Assert.Equal(1, message.Version);
+    }
+
+    [Fact]
+    public void Edit_RefusesAStaleVersion_AndChangesNothing()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value;
+        message.MarkEditCommitted(); // another device already saved
+
+        var result = message.Edit("my reword", Now.AddMinutes(1), expectedVersion: 0);
+
+        Assert.Equal("Messaging.MessageChanged", result.FirstError.Code);
+        // A refused edit must leave the message exactly as it was, or a conflict would still
+        // cost the user their wording.
+        Assert.Equal("hello", message.Content);
+        Assert.Null(message.EditedAt);
+        Assert.Equal(1, message.Version);
+    }
+
+    [Fact]
+    public void Edit_SkipsTheCheck_WhenNoVersionIsPresented()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value;
+        message.MarkEditCommitted();
+
+        // The domain honours a null for a caller with no version to present; the API layer is
+        // what refuses to accept one, so no real client can reach this without one.
+        Assert.True(message.Edit("hello again", Now.AddMinutes(1)).IsSuccess);
+    }
+
+    [Fact]
+    public void Edit_ReportsTheConflict_AfterTheTextChecks()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value;
+        message.MarkEditCommitted();
+
+        // A caller working from a stale view should be told about the conflict, not handed a
+        // validation complaint about text they never actually sent.
+        var tooLong = message.Edit(new string('x', Message.MaxContentLength + 1), Now, 0);
+        Assert.Equal("Messaging.MessageTooLong", tooLong.FirstError.Code);
+
+        var blank = message.Edit("   ", Now, 0);
+        Assert.Equal("Messaging.MessageEmpty", blank.FirstError.Code);
+
+        var fine = message.Edit("a perfectly good reword", Now, 0);
+        Assert.Equal("Messaging.MessageChanged", fine.FirstError.Code);
+    }
+
+    [Fact]
+    public void Edit_RefusesADeletedMessage_BeforeConsideringTheVersion()
+    {
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hello", Now).Value;
+        message.MarkDeleted(Now);
+
+        // A deleted message is a 404 whatever the version says — an edit must never resurrect
+        // one, and "not found" is the more useful answer than "conflict".
+        Assert.Equal("Messaging.MessageNotFound", message.Edit("back?", Now, 0).FirstError.Code);
+    }
 }

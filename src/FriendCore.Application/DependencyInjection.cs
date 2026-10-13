@@ -25,9 +25,13 @@ public static class DependencyInjection
 
         services.AddSingleton<ITagNormalizer, TagNormalizationService>();
         services.AddScoped<MediaResponseFactory>();
+        services.AddScoped<ReplyReferenceFactory>();
         services.AddScoped<PostResponseAssembler>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IModerationService, ModerationService>();
+        // Registered here rather than per handler so all four report commands share one
+        // definition of what a subject snapshot captures.
+        services.AddScoped<ISubjectSnapshotFactory, SubjectSnapshotFactory>();
 
         return services;
     }

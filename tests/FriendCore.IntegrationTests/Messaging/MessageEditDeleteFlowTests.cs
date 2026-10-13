@@ -30,8 +30,15 @@ public class MessageEditDeleteFlowTests(FriendCoreApiFactory factory) : IClassFi
         return (await response.Content.ReadFromJsonAsync<MessageResponse>())!;
     }
 
-    private static Task<HttpResponseMessage> Edit(HttpClient client, string conversationId, string messageId, string content) =>
-        client.PatchAsJsonAsync($"/api/v1/conversations/{conversationId}/messages/{messageId}", new { content });
+    /// <summary>
+    /// The version defaults to 0 because these tests' messages have never been edited, and a
+    /// freshly sent message starts at 0. Tests that edit twice must thread the returned
+    /// version through instead of leaving it at the default.
+    /// </summary>
+    private static Task<HttpResponseMessage> Edit(
+        HttpClient client, string conversationId, string messageId, string content, int version = 0) =>
+        client.PatchAsJsonAsync(
+            $"/api/v1/conversations/{conversationId}/messages/{messageId}", new { content, version });
 
     private static Task<HttpResponseMessage> Delete(HttpClient client, string conversationId, string messageId) =>
         client.DeleteAsync($"/api/v1/conversations/{conversationId}/messages/{messageId}");
@@ -209,5 +216,104 @@ public class MessageEditDeleteFlowTests(FriendCoreApiFactory factory) : IClassFi
 
         var after = await bob.GetFromJsonAsync<ConversationListResponse>("/api/v1/conversations");
         Assert.Equal(1, Assert.Single(after!.Conversations).UnreadCount);
+    }
+
+    [Fact]
+    public async Task Edit_BumpsTheVersion_SoASecondEditCanBeBasedOnIt()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var message = await SendMessage(alice, conversation.Id, "first");
+
+        // A freshly sent message starts at 0, and that is what a client presents first.
+        Assert.Equal(0, message.Version);
+
+        var first = await alice.PatchAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages/{message.Id}",
+            new { content = "second", version = 0 });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var afterFirst = (await first.Content.ReadFromJsonAsync<MessageResponse>())!;
+        Assert.Equal(1, afterFirst.Version);
+
+        // The client now holds version 1, so its next edit is based on current state.
+        var second = await Edit(alice, conversation.Id, message.Id, "third", afterFirst.Version);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(2, (await second.Content.ReadFromJsonAsync<MessageResponse>())!.Version);
+        Assert.Equal("third", await ContentOf(bob, conversation.Id, message.Id));
+    }
+
+    [Fact]
+    public async Task Edit_RefusesAStaleVersion_With409_AndLeavesTheStoredWordingAlone()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var message = await SendMessage(alice, conversation.Id, "first");
+
+        // The same account saves a reword from another device.
+        await Edit(alice, conversation.Id, message.Id, "saved on the phone");
+
+        // This tab still believes it is looking at version 0.
+        var stale = await Edit(alice, conversation.Id, message.Id, "saved on the laptop");
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+
+        // The loser does not overwrite the winner — that is the entire point.
+        Assert.Equal("saved on the phone", await ContentOf(alice, conversation.Id, message.Id));
+        Assert.Equal("saved on the phone", await ContentOf(bob, conversation.Id, message.Id));
+    }
+
+    [Fact]
+    public async Task Edit_RefusesAMissingVersion_With400()
+    {
+        var (alice, _) = await RegisterClient();
+        var (_, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var message = await SendMessage(alice, conversation.Id, "first");
+
+        // Answering without one would silently re-enable last-write-wins for exactly the
+        // clients least likely to want that.
+        var response = await alice.PatchAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages/{message.Id}",
+            new { content = "no version here" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("first", await ContentOf(alice, conversation.Id, message.Id));
+    }
+
+    [Fact]
+    public async Task Edit_StillWorks_ForTheRecipientWatchingTheSameConflict()
+    {
+        // Only the sender may edit, so a recipient's attempt is a 403 regardless of version —
+        // the version check must not be reachable ahead of the ownership rule.
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var message = await SendMessage(alice, conversation.Id, "mine");
+        await Edit(alice, conversation.Id, message.Id, "still mine");
+
+        var response = await Edit(bob, conversation.Id, message.Id, "not mine", version: 0);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("still mine", await ContentOf(alice, conversation.Id, message.Id));
+    }
+
+    [Fact]
+    public async Task Delete_IsUnaffectedByTheEditVersion()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var message = await SendMessage(alice, conversation.Id, "first");
+
+        // The asymmetry this design exists for: a delete is terminal, so it must never be
+        // blocked because the sender was mid-rewrite on another device. It takes no version and
+        // consults none, so there is nothing for it to lose.
+        await Edit(alice, conversation.Id, message.Id, "second");
+
+        var deleted = await alice.DeleteAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages/{message.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
     }
 }

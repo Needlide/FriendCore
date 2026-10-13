@@ -14,7 +14,8 @@ internal sealed class GetMessagesQueryHandler(
     ICurrentUserService currentUserService,
     IMessagingRepository messagingRepository,
     IBlockRepository blockRepository,
-    MediaResponseFactory mediaResponseFactory)
+    MediaResponseFactory mediaResponseFactory,
+    ReplyReferenceFactory replyReferenceFactory)
     : IRequestHandler<GetMessagesQuery, ErrorOr<MessageFeedResponse>>
 {
     private const int PageSize = 20;
@@ -34,8 +35,10 @@ internal sealed class GetMessagesQueryHandler(
             return MessagingErrors.ConversationNotFound;
 
         var cursor = MessageCursor.Decode(request.Cursor);
+        // The viewer's id is part of the query because hiding is per participant: this page is
+        // what THIS user may see, which for the same conversation is not always the same page.
         var messages = await messagingRepository.GetMessagesAsync(
-            conversation.Id, cursor, PageSize + 1, cancellationToken);
+            conversation.Id, userId, cursor, PageSize + 1, cancellationToken);
 
         var hasMore = messages.Count > PageSize;
         var page = hasMore ? messages.Take(PageSize).ToList() : messages;
@@ -43,8 +46,22 @@ internal sealed class GetMessagesQueryHandler(
         // One media lookup for the whole page, not one per message — same shape as the feed.
         var mediaByMessage = await mediaResponseFactory.ForMessagesAsync(page, cancellationToken);
 
+        // And one reaction tally for the whole page, for the same reason: a per-message query
+        // here would be twenty round trips to render twenty bubbles.
+        var reactionsByMessage = await messagingRepository.GetReactionsAsync(
+            page.Select(message => message.Id).ToList(), userId, cancellationToken);
+
+        // And one lookup for every reply target on the page. Batch it deliberately: a reply's
+        // parent is often on a page this thread has NOT loaded, so the client cannot resolve it
+        // from what it already holds.
+        var repliesByMessage = await replyReferenceFactory.ForMessagesAsync(page, cancellationToken);
+
         var items = page
-            .Select(message => MessageResponse.Create(message, mediaByMessage.GetValueOrDefault(message.Id)))
+            .Select(message => MessageResponse.Create(
+                message,
+                mediaByMessage.GetValueOrDefault(message.Id),
+                ReactionResponse.FromTallies(reactionsByMessage.GetValueOrDefault(message.Id)),
+                repliesByMessage.GetValueOrDefault(message.Id)))
             .ToList();
         var nextCursor = hasMore ? MessageCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 

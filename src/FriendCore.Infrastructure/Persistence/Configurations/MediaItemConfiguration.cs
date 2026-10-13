@@ -82,5 +82,18 @@ public sealed class MediaItemConfiguration : IEntityTypeConfiguration<MediaItem>
         });
 
         builder.Navigation(media => media.Variants).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Nullable because it postdates the column: the bytes behind existing rows live in object
+        // storage, not here, so they cannot be backfilled without re-reading every original. Null
+        // therefore means "unknown", and every consumer must treat an unknown hash as
+        // never-matching rather than as a shared one.
+        builder.Property(media => media.ContentHash)
+            .HasColumnName("content_hash")
+            .HasMaxLength(64);
+
+        // Serves "has this exact file been uploaded before?". Deliberately not partial on Status:
+        // EF stores MediaStatus as its integer value, and filtering a partial index on another
+        // column's state would bake that integer into the schema.
+        builder.HasIndex(media => media.ContentHash);
     }
 }

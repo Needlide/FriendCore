@@ -43,4 +43,17 @@ public interface IMediaRepository
     // Soft-delete staged for a moderator's SaveChanges, matching PostRepository's shape so the
     // removal and the audit entry commit together (§10.3).
     void StageSoftDelete(MediaItem media);
+
+    // ---- Consent refusals ---------------------------------------------------------------------
+    // Written by MessagingRepository, not here: the refusal must commit in the same transaction
+    // as the message deletion that caused it, and only that path owns that transaction. Read from
+    // here, because the send path already depends on this repository.
+
+    // Which of <paramref name="contentHashes" /> this sender may not send to this recipient.
+    // Returns the refused subset rather than a bool, so one call answers a whole bundle.
+    Task<IReadOnlyList<string>> GetRefusedHashesAsync(
+        Ulid senderId,
+        Ulid recipientId,
+        IReadOnlyCollection<string> contentHashes,
+        CancellationToken cancellationToken = default);
 }

@@ -41,8 +41,10 @@ internal sealed class StartSupportConversationCommandHandler(
             if (created.IsError)
                 return created.Errors;
 
-            conversation = created.Value;
-            await messagingRepository.AddConversationAsync(conversation, cancellationToken);
+            // Same race as a normal conversation: the user may already have one open in another
+            // tab. Returns whichever exists.
+            conversation = await messagingRepository.AddConversationOrGetExistingAsync(
+                created.Value, cancellationToken);
         }
 
         var unread = await messagingRepository.CountUnreadAsync(

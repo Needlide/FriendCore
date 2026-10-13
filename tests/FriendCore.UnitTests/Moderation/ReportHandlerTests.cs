@@ -2,6 +2,7 @@ using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Commands.ReportPost;
 using FriendCore.Application.Moderation.Commands.ReportUser;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -18,6 +19,7 @@ public class ReportHandlerTests
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IReportRepository _reportRepository = Substitute.For<IReportRepository>();
+    private readonly ISubjectSnapshotFactory _snapshotFactory = Substitute.For<ISubjectSnapshotFactory>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _reporterId = Ulid.NewUlid();
 
@@ -28,10 +30,10 @@ public class ReportHandlerTests
     }
 
     private ReportPostCommandHandler PostHandler() =>
-        new(_currentUserService, _postRepository, _reportRepository, _dateTimeProvider);
+        new(_currentUserService, _postRepository, _reportRepository, _snapshotFactory, _dateTimeProvider);
 
     private ReportUserCommandHandler UserHandler() =>
-        new(_currentUserService, _userRepository, _reportRepository, _dateTimeProvider);
+        new(_currentUserService, _userRepository, _reportRepository, _snapshotFactory, _dateTimeProvider);
 
     [Fact]
     public async Task ReportPost_ReturnsNotFound_WhenPostMissing()

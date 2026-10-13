@@ -44,8 +44,10 @@ internal sealed class StartConversationCommandHandler(
             if (created.IsError)
                 return created.Errors;
 
-            conversation = created.Value;
-            await messagingRepository.AddConversationAsync(conversation, cancellationToken);
+            // Returns the existing conversation if a simultaneous request won the race, so both
+            // callers end up in the same thread instead of one of them getting a 500.
+            conversation = await messagingRepository.AddConversationOrGetExistingAsync(
+                created.Value, cancellationToken);
         }
 
         var unread = await messagingRepository.CountUnreadAsync(

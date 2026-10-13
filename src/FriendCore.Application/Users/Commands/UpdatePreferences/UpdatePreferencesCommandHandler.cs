@@ -35,6 +35,7 @@ internal sealed class UpdatePreferencesCommandHandler(
             request.DisableAutoplay,
             request.ReduceVisualNoise,
             now);
+        preferences.UpdateComposer(request.SendMessageOnEnter, now);
 
         await userRepository.UpdateAsync(user, cancellationToken);
         return PreferencesResponse.Create(preferences, user.ContentPreference);

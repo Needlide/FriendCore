@@ -1,6 +1,7 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Moderation.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Moderation;
@@ -12,6 +13,7 @@ internal sealed class ReportMediaCommandHandler(
     ICurrentUserService currentUserService,
     IMediaRepository mediaRepository,
     IReportRepository reportRepository,
+    ISubjectSnapshotFactory snapshotFactory,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<ReportMediaCommand, ErrorOr<Success>>
 {
@@ -44,9 +46,17 @@ internal sealed class ReportMediaCommandHandler(
         if (request.Category == ReportCategoryInput.FlashingLights)
             media.FlagSafety(true, true, MediaSafetySource.UserReports, dateTimeProvider.UtcNow);
 
+        // Captured here, while the subject still exists — at review time it may be
+
+        // gone, which is the whole problem this snapshot exists to solve.
+
+        var snapshot = await snapshotFactory.CaptureAsync(
+
+            ReportTargetType.Media, media.Id, cancellationToken);
+
         var report = Report.Create(
             userId, ReportTargetType.Media, media.Id, request.Category.ToDomain(), request.Note,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow, snapshot);
         if (report.IsError)
             return report.Errors;
 

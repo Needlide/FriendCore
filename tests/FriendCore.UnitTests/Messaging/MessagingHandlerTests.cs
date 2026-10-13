@@ -25,6 +25,7 @@ public class MessagingHandlerTests
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
     private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
     private readonly MediaResponseFactory _mediaResponseFactory;
+    private readonly ReplyReferenceFactory _replyReferenceFactory;
     private readonly IRealtimeNotifier _realtimeNotifier = Substitute.For<IRealtimeNotifier>();
     private readonly IPublisher _publisher = Substitute.For<IPublisher>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
@@ -40,6 +41,9 @@ public class MessagingHandlerTests
         // executing, the lookup is what we are stubbing.
         _mediaResponseFactory = new MediaResponseFactory(
             _mediaRepository, Options.Create(new StorageOptions()));
+        // Real over the substitute for the same reason: the truncation and the deleted-versus-no-
+        // text distinction are the parts worth executing, the lookup is what we are stubbing.
+        _replyReferenceFactory = new ReplyReferenceFactory(_messagingRepository);
         // Default: nothing is already attached, so attachment tests opt in explicitly.
         _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([]);
@@ -50,7 +54,8 @@ public class MessagingHandlerTests
 
     private SendMessageCommandHandler SendHandler() =>
         new(_currentUserService, _messagingRepository, _blockRepository, _mediaRepository,
-            _mediaResponseFactory, _realtimeNotifier, _publisher, _dateTimeProvider);
+            Substitute.For<ISender>(), _mediaResponseFactory, _replyReferenceFactory,
+            _realtimeNotifier, _publisher, _dateTimeProvider);
 
     [Fact]
     public async Task Start_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -95,7 +100,7 @@ public class MessagingHandlerTests
 
         Assert.True(result.IsError);
         Assert.Equal("Messaging.RecipientNotFound", result.FirstError.Code);
-        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationAsync(default!, default);
+        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationOrGetExistingAsync(default!, default);
     }
 
     [Fact]
@@ -104,11 +109,18 @@ public class MessagingHandlerTests
         _messagingRepository.FindDirectAsync(_userId, _recipient.Id, Arg.Any<CancellationToken>())
             .Returns((Conversation?)null);
 
+        // The repository hands the conversation BACK, and the handler uses that returned instance —
+        // which is how a request that lost the insert race ends up in the winner's thread rather
+        // than throwing. So the stub has to return one, not null.
+        _messagingRepository
+            .AddConversationOrGetExistingAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Conversation>());
+
         var result = await StartHandler().Handle(new StartConversationCommand("bob"), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal(_recipient.Id.ToString(), result.Value.OtherParticipant.UserId);
-        await _messagingRepository.Received(1).AddConversationAsync(
+        await _messagingRepository.Received(1).AddConversationOrGetExistingAsync(
             Arg.Is<Conversation>(c => c.HasParticipant(_userId) && c.HasParticipant(_recipient.Id)),
             Arg.Any<CancellationToken>());
     }
@@ -124,7 +136,7 @@ public class MessagingHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(existing.Id.ToString(), result.Value.Id);
-        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationAsync(default!, default);
+        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationOrGetExistingAsync(default!, default);
     }
 
     [Fact]

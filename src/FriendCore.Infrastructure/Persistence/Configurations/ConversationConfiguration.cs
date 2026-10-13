@@ -22,6 +22,16 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
         // Most "list my conversations" queries sort by recency.
         builder.HasIndex(conversation => conversation.LastMessageAt);
 
+        // The whole point of DirectKey: the database, not application code, is what stops two
+        // simultaneous starts creating two conversations between the same two people. NULLs are
+        // distinct in a Postgres unique index, so group conversations are unaffected by this.
+        builder.Property(conversation => conversation.DirectKey).HasColumnName("direct_key");
+
+        builder.HasIndex(conversation => conversation.DirectKey)
+            .IsUnique()
+            .HasFilter("direct_key IS NOT NULL")
+            .HasDatabaseName("ix_conversations_direct_key");
+
         // Participants owned (auto-included), mirroring profile_tags on User.
         builder.OwnsMany(conversation => conversation.Participants, participant =>
         {

@@ -7,6 +7,7 @@ public sealed record PreferencesResponse(
     bool ReduceMotion,
     bool DisableAutoplay,
     bool ReduceVisualNoise,
+    bool SendMessageOnEnter,
     string ContentPreference)
 {
     public static PreferencesResponse Create(UserPreferences preferences, ContentPreference contentPreference) =>
@@ -15,5 +16,6 @@ public sealed record PreferencesResponse(
             preferences.ReduceMotion,
             preferences.DisableAutoplay,
             preferences.ReduceVisualNoise,
+            preferences.SendMessageOnEnter,
             contentPreference.ToString());
 }

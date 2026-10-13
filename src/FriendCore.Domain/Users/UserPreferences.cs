@@ -23,6 +23,18 @@ public sealed class UserPreferences
     public bool ReduceMotion { get; private set; }
     public bool DisableAutoplay { get; private set; } = true;
     public bool ReduceVisualNoise { get; private set; }
+
+    /// <summary>
+    ///     True (the default) sends a message on Enter and leaves Shift+Enter for a newline.
+    ///     False inverts it: Enter adds a newline and Ctrl+Enter — or Cmd+Enter, since that is
+    ///     the modifier macOS keyboards actually carry — sends.
+    /// </summary>
+    /// <remarks>
+    ///     Defaults to true because it is the behaviour every messenger already trained people
+    ///     on, and because this platform's whole premise is reconnecting with people: making the
+    ///     comfortable mode opt-in would be a poor first impression for its own audience.
+    /// </remarks>
+    public bool SendMessageOnEnter { get; private set; } = true;
     public IReadOnlyList<string> KeywordFilters => _keywordFilters;
     public IReadOnlyList<string> MutedNotificationTypes => _mutedNotificationTypes;
 
@@ -42,6 +54,19 @@ public sealed class UserPreferences
         ReduceMotion = reduceMotion;
         DisableAutoplay = disableAutoplay;
         ReduceVisualNoise = reduceVisualNoise;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    ///     Chat composer behaviour. Deliberately NOT folded into
+    ///     <see cref="UpdateAccessibility" />: that method's four flags all describe how the
+    ///     app presents itself to the person using it, and a send-key binding is a different
+    ///     kind of setting — it belongs to the composer, not to accessibility. Sharing one
+    ///     method would also have made the accessibility group's name a lie.
+    /// </summary>
+    public void UpdateComposer(bool sendMessageOnEnter, DateTimeOffset now)
+    {
+        SendMessageOnEnter = sendMessageOnEnter;
         UpdatedAt = now;
     }
 

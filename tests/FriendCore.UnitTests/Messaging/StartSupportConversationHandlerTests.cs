@@ -49,7 +49,7 @@ public class StartSupportConversationHandlerTests
 
         Assert.True(result.IsError);
         Assert.Equal("Messaging.SupportUnavailable", result.FirstError.Code);
-        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationAsync(default!, default);
+        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationOrGetExistingAsync(default!, default);
     }
 
     [Fact]
@@ -82,11 +82,17 @@ public class StartSupportConversationHandlerTests
         _messagingRepository.FindDirectAsync(_userId, _admin.Id, Arg.Any<CancellationToken>())
             .Returns((Conversation?)null);
 
+        // The repository hands the conversation BACK and the handler uses that returned instance —
+        // the same race recovery as a normal conversation, so the stub must return one.
+        _messagingRepository
+            .AddConversationOrGetExistingAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Conversation>());
+
         var result = await CreateHandler().Handle(new StartSupportConversationCommand(), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal(_admin.Id.ToString(), result.Value.OtherParticipant.UserId);
-        await _messagingRepository.Received(1).AddConversationAsync(
+        await _messagingRepository.Received(1).AddConversationOrGetExistingAsync(
             Arg.Is<Conversation>(c => c.HasParticipant(_userId) && c.HasParticipant(_admin.Id)),
             Arg.Any<CancellationToken>());
     }
@@ -102,6 +108,6 @@ public class StartSupportConversationHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(existing.Id.ToString(), result.Value.Id);
-        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationAsync(default!, default);
+        await _messagingRepository.DidNotReceiveWithAnyArgs().AddConversationOrGetExistingAsync(default!, default);
     }
 }

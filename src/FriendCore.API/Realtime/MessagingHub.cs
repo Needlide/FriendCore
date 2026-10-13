@@ -17,4 +17,8 @@ public sealed class MessagingHub : Hub
     // carry the id and the full current state rather than telling it to refetch blindly.
     public const string EditedMethod = "MessageEdited";
     public const string DeletedMethod = "MessageDeleted";
+
+    // Same rationale as the edit: the tapper has the POST response, but the other participant's
+    // open thread has to move the chip, and the tapper's other devices would go stale.
+    public const string ReactionChangedMethod = "MessageReactionChanged";
 }

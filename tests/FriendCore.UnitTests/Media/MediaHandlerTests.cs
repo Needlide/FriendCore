@@ -65,7 +65,7 @@ public class MediaHandlerTests
         await _storageService.DidNotReceiveWithAnyArgs()
             .UploadAsync(default!, default!, default!, default);
         await _mediaRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
-        _processingQueue.DidNotReceiveWithAnyArgs().Enqueue(default);
+        await _processingQueue.DidNotReceiveWithAnyArgs().EnqueueAsync(default, default);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class MediaHandlerTests
         Assert.Equal(MediaStatus.Processing, added.Status);
         Assert.Equal(added.Id.ToString(), result.Value.Id);
         Assert.Equal("Processing", result.Value.Status);
-        _processingQueue.Received(1).Enqueue(added.Id);
+        await _processingQueue.Received(1).EnqueueAsync(added.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]

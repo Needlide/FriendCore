@@ -123,4 +123,25 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
         // so no action can persist without an audit record (§10.3).
         context.MediaItems.Remove(media);
     }
+
+    // ---- Consent refusals ---------------------------------------------------------------------
+    // Refusals are never soft-deleted, so no query filter applies to this table. Nothing else
+    // may add one: the one failure this lookup must never have is quietly returning nothing.
+
+    public async Task<IReadOnlyList<string>> GetRefusedHashesAsync(
+        Ulid senderId,
+        Ulid recipientId,
+        IReadOnlyCollection<string> contentHashes,
+        CancellationToken cancellationToken = default)
+    {
+        if (contentHashes.Count == 0)
+            return [];
+
+        return await context.MediaRefusals
+            .Where(refusal => refusal.RecipientId == recipientId
+                              && refusal.SenderId == senderId
+                              && contentHashes.Contains(refusal.ContentHash))
+            .Select(refusal => refusal.ContentHash)
+            .ToListAsync(cancellationToken);
+    }
 }
