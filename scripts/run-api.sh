@@ -53,4 +53,32 @@ fi
 echo "run-api: starting in ${ASPNETCORE_ENVIRONMENT:-unset} on ${ASPNETCORE_URLS:-unset}"
 echo "run-api: env from $ENV_FILE"
 
-exec dotnet run --project "$ROOT/src/FriendCore.API" --no-launch-profile
+# Run the built assembly, not `dotnet run`.
+#
+# `dotnet run` is a build-and-launch wrapper: it forks the real server as a child
+# and exits when that child exits. Under systemd that means the supervisor is
+# watching the wrapper, and killing the server makes the wrapper report success —
+# so Restart=on-failure never fires and the API stays down. Running the assembly
+# directly makes the server itself PID 1 of the unit, so signals, exit codes and
+# restarts behave.
+#
+# Rebuild after changing code:  systemctl --user restart friendcore-api
+# (or set FRIENDCORE_BUILD=1 to build on every start, which is slower but handy
+# while iterating.)
+API_PROJECT="$ROOT/src/FriendCore.API"
+API_DLL="$API_PROJECT/bin/Release/net10.0/FriendCore.API.dll"
+
+if [ "${FRIENDCORE_BUILD:-0}" = "1" ] || [ ! -f "$API_DLL" ]; then
+  echo "run-api: building Release (this takes a minute)"
+  dotnet build "$API_PROJECT" -c Release --nologo
+fi
+
+if [ ! -f "$API_DLL" ]; then
+  echo "run-api: $API_DLL still missing after build — cannot start" >&2
+  exit 1
+fi
+
+echo "run-api: exec $API_DLL"
+# contentRoot matches what `dotnet run` used to set, so relative paths in config
+# and Serilog resolve the same way they did before.
+exec dotnet "$API_DLL" --contentRoot "$API_PROJECT"

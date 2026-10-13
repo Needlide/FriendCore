@@ -1,0 +1,23 @@
+[Unit]
+Description=FriendCore API
+Documentation=https://github.com/Needlide/FriendCore
+# network-online only. A user unit cannot Requires= a system unit, so there is no
+# docker.service dependency here — if the daemon is not up the API fails to reach
+# Postgres and exits; Restart=always then retries until Docker appears.
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/Documents/FriendCore/FriendCore/scripts/run-api.sh
+# always, not on-failure. The API shuts down gracefully on SIGTERM, so a kill or
+# a manual `systemctl stop` of the child produced exit code 0 and on-failure left
+# it dead. This service is never supposed to exit by itself.
+Restart=always
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# systemd stops the process, so it must not also be a child of some shell.
+ExecStartPre=/usr/bin/env true
+
+[Install]
+WantedBy=default.target
