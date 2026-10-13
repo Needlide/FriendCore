@@ -28,7 +28,7 @@ internal sealed class GetTagAutocompleteQueryHandler(
             $"tags:autocomplete:{slug}",
             async token =>
             {
-                var tags = await tagRepository.SearchActiveByPrefixAsync(slug, MaxResults, token);
+                var tags = await tagRepository.SearchUsableByPrefixAsync(slug, MaxResults, token);
                 var suggestions = tags
                     .Select(tag => new TagSuggestion(tag.Id.ToString(), tag.Name, tag.Slug, tag.TotalCount))
                     .ToList();

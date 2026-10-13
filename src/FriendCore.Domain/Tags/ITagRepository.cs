@@ -12,7 +12,7 @@ public interface ITagRepository
     Task<IReadOnlyList<Tag>> GetByIdsAsync(IReadOnlyCollection<Ulid> ids,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Tag>> SearchActiveByPrefixAsync(
+    Task<IReadOnlyList<Tag>> SearchUsableByPrefixAsync(
         string slugPrefix,
         int limit,
         CancellationToken cancellationToken = default);
