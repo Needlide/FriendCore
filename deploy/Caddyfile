@@ -32,6 +32,24 @@ my-little.jerkface.net {
 			respond 404
 		}
 
+		# Media bytes, straight from the object store.
+		#
+		# The API composes variant URLs as {Storage:PublicBaseUrl}{storageKey}, i.e.
+		# /uploads/variants/<mediaId>/<size>.webp on whatever host PublicBaseUrl names.
+		# The API serves no such route — it has no endpoint that streams media — so
+		# pointing PublicBaseUrl at the API origin 404s every image.
+		#
+		# Routing it to the bucket here keeps the intent (keys stay keys, so moving to
+		# R2/CDN later is config-only) and needs no new DNS record or port forward:
+		# the object store is reachable from here over the tunnel.
+		#
+		# Only variants are reachable. The bucket policy makes uploads/variants/*
+		# public and leaves uploads/originals/* private, so originals return 403 from
+		# RustFS itself — the privacy boundary is the bucket's, not this route's.
+		handle /uploads/* {
+			reverse_proxy 10.7.0.3:9000
+		}
+
 		handle {
 			reverse_proxy 10.7.0.3:5024 {
 				# Set these rather than append, so a client-supplied
