@@ -9,7 +9,8 @@ namespace FriendCore.Application.Users.Queries.GetUserProfile;
 internal sealed class GetUserProfileQueryHandler(
     IUserRepository userRepository,
     ICurrentUserService currentUserService,
-    IBlockRepository blockRepository)
+    IBlockRepository blockRepository,
+    IFollowRepository followRepository)
     : IRequestHandler<GetUserProfileQuery, ErrorOr<UserProfileResponse>>
 {
     public async Task<ErrorOr<UserProfileResponse>> Handle(
@@ -28,6 +29,13 @@ internal sealed class GetUserProfileQueryHandler(
             && await blockRepository.ExistsBetweenAsync(viewerId, user.Id, cancellationToken))
             return UserErrors.NotFound;
 
-        return UserProfileResponse.FromUser(user);
+        // The follow relationship belongs to the viewer, not the profile, so it has to be
+        // resolved here — the User aggregate cannot know it. Without it the client's follow
+        // button has nothing to restore on load and reverts to "Follow" after a refresh.
+        var isFollowedByViewer = currentUserService.UserId is { } followerId
+            && followerId != user.Id
+            && await followRepository.ExistsAsync(followerId, user.Id, cancellationToken);
+
+        return UserProfileResponse.FromUser(user, isFollowedByViewer);
     }
 }

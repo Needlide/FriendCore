@@ -17,6 +17,38 @@ public class FollowFlowTests(FriendCoreApiFactory factory) : IClassFixture<Frien
     }
 
     [Fact]
+    public async Task Profile_ReportsFollowState_BothWaysAndForSelf()
+    {
+        // The follow button used to revert to "Follow" after a refresh because the profile
+        // payload carried no relationship for the client to restore from.
+        var aUsername = AuthScenarios.NewUsername();
+        var bUsername = AuthScenarios.NewUsername();
+        var aClient = await RegisterClient(aUsername);
+        await RegisterUser(bUsername);
+
+        var before = await aClient.GetFromJsonAsync<UserProfileResponse>(
+            $"/api/v1/users/{bUsername}");
+        Assert.False(before!.IsFollowedByViewer);
+
+        await aClient.PostAsync($"/api/v1/users/{bUsername}/follow", content: null);
+
+        var after = await aClient.GetFromJsonAsync<UserProfileResponse>(
+            $"/api/v1/users/{bUsername}");
+        Assert.True(after!.IsFollowedByViewer);
+
+        // The relationship is directional: B does not follow A just because A followed B.
+        var bClient = await RegisterClient(AuthScenarios.NewUsername());
+        var bSeesA = await bClient.GetFromJsonAsync<UserProfileResponse>(
+            $"/api/v1/users/{aUsername}");
+        Assert.False(bSeesA!.IsFollowedByViewer);
+
+        // You never follow yourself.
+        var selfView = await aClient.GetFromJsonAsync<UserProfileResponse>(
+            $"/api/v1/users/{aUsername}");
+        Assert.False(selfView!.IsFollowedByViewer);
+    }
+
+    [Fact]
     public async Task Follow_AddsToFollowersAndFollowing()
     {
         var aUsername = AuthScenarios.NewUsername();

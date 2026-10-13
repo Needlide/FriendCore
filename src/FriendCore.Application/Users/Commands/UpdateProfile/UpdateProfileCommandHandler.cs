@@ -34,6 +34,9 @@ internal sealed class UpdateProfileCommandHandler(
             return updateResult.Errors;
 
         await userRepository.UpdateAsync(user, cancellationToken);
-        return UserProfileResponse.FromUser(user);
+
+        // This is always your own profile, and you never follow yourself, so the
+        // relationship is false by definition rather than by an extra query.
+        return UserProfileResponse.FromUser(user, isFollowedByViewer: false);
     }
 }
