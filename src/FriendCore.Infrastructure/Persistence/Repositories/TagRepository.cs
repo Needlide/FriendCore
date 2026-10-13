@@ -36,20 +36,13 @@ public sealed class TagRepository(AppDbContext context) : ITagRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Tag>> SearchUsableByPrefixAsync(
+    public async Task<IReadOnlyList<Tag>> SearchActiveByPrefixAsync(
         string slugPrefix,
         int limit,
         CancellationToken cancellationToken = default)
     {
-        // PendingReview counts as usable, matching the rule already applied when
-        // tags are read elsewhere (GetByIdsForDisplayAsync above). Tags are CREATED
-        // as PendingReview, so filtering on Active alone made this return nothing for
-        // every tag that had not yet been through moderation — which, without an
-        // active moderation pass, is all of them. Autocomplete then offered no
-        // suggestions and the UI fell through to "you're the first" on every keystroke.
         return await context.Tags
-            .Where(tag => (tag.Status == TagStatus.Active || tag.Status == TagStatus.PendingReview)
-                          && tag.Slug.StartsWith(slugPrefix))
+            .Where(tag => tag.Status == TagStatus.Active && tag.Slug.StartsWith(slugPrefix))
             .OrderByDescending(tag => tag.TotalCount)
             .ThenBy(tag => tag.Slug)
             .Take(limit)

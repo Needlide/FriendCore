@@ -34,13 +34,13 @@ public class GetTagAutocompleteQueryHandlerTests
         Assert.Empty(result.Value.Suggestions);
         Assert.False(result.Value.HasExactMatch);
         await _tagRepository.DidNotReceive()
-            .SearchUsableByPrefixAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+            .SearchActiveByPrefixAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_NormalizesPrefixAndMapsResults()
     {
-        _tagRepository.SearchUsableByPrefixAsync("pho", Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _tagRepository.SearchActiveByPrefixAsync("pho", Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([ActiveTag("Photography", "photography"), ActiveTag("Photos", "photos")]);
 
         var result = await CreateHandler().Handle(new GetTagAutocompleteQuery("  Pho "), CancellationToken.None);
@@ -54,7 +54,7 @@ public class GetTagAutocompleteQueryHandlerTests
     [Fact]
     public async Task Handle_SetsHasExactMatch_WhenSlugMatchesExactly()
     {
-        _tagRepository.SearchUsableByPrefixAsync("photography", Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _tagRepository.SearchActiveByPrefixAsync("photography", Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([ActiveTag("Photography", "photography")]);
 
         var result = await CreateHandler().Handle(new GetTagAutocompleteQuery("Photography"), CancellationToken.None);
