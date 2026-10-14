@@ -1,6 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
+    # Survive a reboot. Without this Docker's default policy is "no",
+    # so the containers stayed Exited(0) after every restart and the API
+    # then crash-looped on a refused connection to the object store.
+    restart: unless-stopped
     container_name: friendcore-postgres
     environment:
       POSTGRES_USER: friendcore
@@ -18,6 +22,10 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Survive a reboot. Without this Docker's default policy is "no",
+    # so the containers stayed Exited(0) after every restart and the API
+    # then crash-looped on a refused connection to the object store.
+    restart: unless-stopped
     container_name: friendcore-redis
     ports:
       - "6379:6379"
@@ -41,6 +49,10 @@ services:
 
   minio:
     image: rustfs/rustfs:1.0.0
+    # Survive a reboot. Without this Docker's default policy is "no",
+    # so the containers stayed Exited(0) after every restart and the API
+    # then crash-looped on a refused connection to the object store.
+    restart: unless-stopped
     container_name: friendcore-minio
     depends_on:
       minio-init:

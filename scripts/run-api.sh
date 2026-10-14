@@ -53,6 +53,43 @@ fi
 echo "run-api: starting in ${ASPNETCORE_ENVIRONMENT:-unset} on ${ASPNETCORE_URLS:-unset}"
 echo "run-api: env from $ENV_FILE"
 
+# Wait for the dependencies before starting.
+#
+# Postgres, Redis and the object store are containers, and this is a *user* unit: it
+# cannot declare Requires=docker.service, because a user unit cannot depend on a
+# system unit. So the user manager starts this the moment the session comes up,
+# which can be before Docker has finished starting the containers.
+#
+# StorageBucketInitializer then does an unhandled S3 call against a port nothing is
+# listening on. Connection refused aborts the process (SIGABRT), systemd restarts it,
+# it races again, and the result is a crash loop that looks identical to "the website
+# doesn't come up" — with no indication that the cause was startup ordering.
+#
+# Blocking here turns that failure into a few seconds of waiting. The timeout is
+# deliberately finite: if a dependency is genuinely down, we want to exit and let
+# Restart=always retry, not hang forever holding a wedged process.
+DEPENDENCY_TIMEOUT="${DEPENDENCY_TIMEOUT:-120}"
+
+wait_for() {
+  local host="$1" port="$2" name="$3" waited=0
+  while ! (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; do
+    exec 3<&- 2>/dev/null || true
+    if [ "$waited" -ge "$DEPENDENCY_TIMEOUT" ]; then
+      echo "run-api: $name ($host:$port) still unreachable after ${DEPENDENCY_TIMEOUT}s" >&2
+      echo "          is docker running?  sudo systemctl start docker" >&2
+      echo "          are the containers up? docker compose -f docker-compose.dev.yml up -d --wait" >&2
+      return 1
+    fi
+    [ $((waited % 10)) -eq 0 ] && echo "run-api: waiting for $name ($host:$port)… ${waited}s"
+    sleep 2; waited=$((waited + 2))
+  done
+  echo "run-api: $name ready after ${waited}s"
+}
+
+wait_for localhost 5432 postgres || exit 1
+wait_for localhost 6379 redis    || exit 1
+wait_for localhost 9000 storage  || exit 1
+
 # Run the built assembly, not `dotnet run`.
 #
 # `dotnet run` is a build-and-launch wrapper: it forks the real server as a child
