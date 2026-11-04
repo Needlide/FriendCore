@@ -34,7 +34,7 @@ public class ReportMediaHandlerTests
         _dateTimeProvider.UtcNow.Returns(Now);
         _media = MediaItem.Create(
             _uploaderId, "x.png", "image/png", "png",
-            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+            MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(_media.Id, Arg.Any<CancellationToken>()).Returns(_media);
     }
 
@@ -69,7 +69,7 @@ public class ReportMediaHandlerTests
     {
         var mine = MediaItem.Create(
             _reporterId, "x.png", "image/png", "png",
-            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+            MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(mine.Id, Arg.Any<CancellationToken>()).Returns(mine);
 
         var result = await Handler().Handle(
@@ -99,8 +99,8 @@ public class ReportMediaHandlerTests
 
         // And the gate, so a report nobody triages for hours cannot leave harmful media in
         // front of the readers who opted out of it.
-        Assert.True(_media.HasFlashingWarning);
-        Assert.True(_media.HasIntenseMotionWarning);
+        Assert.True(_media.SafetyFlags.IsSet("flashing"));
+        Assert.True(_media.SafetyFlags.IsSet("intenseMotion"));
         Assert.Equal(MediaSafetySource.UserReports, _media.SafetySource);
         Assert.Equal(Now, _media.SafetyFlaggedAt);
     }
@@ -116,8 +116,8 @@ public class ReportMediaHandlerTests
         var result = await Report(category);
 
         Assert.False(result.IsError);
-        Assert.False(_media.HasFlashingWarning);
-        Assert.False(_media.HasIntenseMotionWarning);
+        Assert.False(_media.SafetyFlags.IsSet("flashing"));
+        Assert.False(_media.SafetyFlags.IsSet("intenseMotion"));
         Assert.Equal(MediaSafetySource.None, _media.SafetySource);
         await _reportRepository.Received(1).AddAsync(
             Arg.Is<Report>(r => r.TargetType == ReportTargetType.Media), Arg.Any<CancellationToken>());
@@ -141,7 +141,10 @@ public class ReportMediaHandlerTests
     {
         // FlagSafety treats a Moderator source as authoritative; this asserts we go through it
         // rather than setting the flags directly, which would silently downgrade a moderator.
-        _media.FlagSafety(true, true, MediaSafetySource.Moderator, Now.AddHours(-1));
+        _media.FlagSafety(
+            MediaSafetyFlags.From(("flashing", true), ("intenseMotion", true)),
+            MediaSafetySource.Moderator,
+            Now.AddHours(-1));
 
         await Report(ReportCategoryInput.Copyright);
 

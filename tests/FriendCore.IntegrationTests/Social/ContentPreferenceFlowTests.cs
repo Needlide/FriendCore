@@ -28,6 +28,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         return client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
             reduceVisualNoise = false,
@@ -57,6 +58,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
 
         var initial = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
         Assert.True(initial!.HideFlashingMedia);
+        Assert.True(initial.HideArachnidMedia);
         Assert.Equal("General", initial.ContentPreference);
 
         var patched = await SetContentPreference(client, "Sensitive");
@@ -154,6 +156,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         var patched = await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
             reduceVisualNoise = false,
@@ -176,6 +179,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
             reduceVisualNoise = false,
@@ -188,6 +192,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
             reduceVisualNoise = false,

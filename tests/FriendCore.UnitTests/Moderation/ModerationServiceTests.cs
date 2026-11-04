@@ -230,7 +230,7 @@ public class ModerationServiceTests
     {
         var media = MediaItem.Create(
             UserTestFactory.Create(username: "uploader").Id, "a.png", "image/png", ".png",
-            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+            MediaSafetyFlags.Empty, Now);
         var report = Report.Create(
             Ulid.NewUlid(), ReportTargetType.Media, media.Id, ReportCategory.FlashingLights, null, Now).Value;
         _mediaRepository.GetByIdForModerationAsync(media.Id, Arg.Any<CancellationToken>())
@@ -258,7 +258,7 @@ public class ModerationServiceTests
         var uploader = UserTestFactory.Create(username: "uploader");
         var media = MediaItem.Create(
             uploader.Id, "a.png", "image/png", ".png",
-            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now);
+            MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdForModerationAsync(media.Id, Arg.Any<CancellationToken>())
             .Returns(media);
         _userRepository.GetByIdIgnoringBlocksAsync(uploader.Id, Arg.Any<CancellationToken>())

@@ -62,12 +62,12 @@ public class RevealMediaHandlerTests
     private static MediaItem FlaggedMedia(Ulid uploaderId) =>
         Ready(MediaItem.Create(
             uploaderId, "x.png", "image/png", "png",
-            hasFlashingWarning: true, hasIntenseMotionWarning: false, Now));
+            MediaSafetyFlags.From(("flashing", true)), Now));
 
     private static MediaItem PlainMedia(Ulid uploaderId) =>
         Ready(MediaItem.Create(
             uploaderId, "x.png", "image/png", "png",
-            hasFlashingWarning: false, hasIntenseMotionWarning: false, Now));
+            MediaSafetyFlags.Empty, Now));
 
     private void Arrange(MediaItem media, MediaAttachment attachment)
     {
@@ -136,6 +136,43 @@ public class RevealMediaHandlerTests
 
         Assert.False(result.IsError);
         Assert.NotEmpty(result.Value.Variants);
+    }
+
+    [Theory]
+    [InlineData("arachnophobia")]
+    [InlineData("explicit")]
+    public async Task ConsentFlaggedMedia_IsAuthorizedLikeAnyOtherGatedMedia(string flag)
+    {
+        // The reveal endpoint must recognize every flag that can withhold a URL, not just the
+        // original flashing/motion pair. Missing one turns the placeholder's "Show media" button
+        // into a 404 for media the reader is actually allowed to see.
+        var media = Ready(MediaItem.Create(
+            _uploaderId, "x.png", "image/png", "png",
+            MediaSafetyFlags.From((flag, true)), Now));
+        Arrange(media, new MediaAttachment(_postId, null, null));
+        var post = Post.Create(_uploaderId, "look", ContentSensitivity.General, Now).Value;
+        _postRepository.GetByIdAsync(_postId, Arg.Any<CancellationToken>()).Returns(post);
+
+        var result = await Reveal(media.Id);
+
+        Assert.False(result.IsError);
+        Assert.NotEmpty(result.Value.Variants);
+        Assert.Equal(flag == "explicit" ? "Explicit" : "Arachnophobia", result.Value.GateReason);
+    }
+
+    [Theory]
+    [InlineData("arachnophobia")]
+    [InlineData("explicit")]
+    public async Task Stranger_MayNotReveal_ConsentFlaggedMediaAttachedToNothing(string flag)
+    {
+        var media = Ready(MediaItem.Create(
+            _uploaderId, "x.png", "image/png", "png",
+            MediaSafetyFlags.From((flag, true)), Now));
+        Arrange(media, MediaAttachment.Unattached);
+
+        var result = await Reveal(media.Id);
+
+        Assert.Equal("Media.NotFound", result.FirstError.Code);
     }
 
     [Fact]

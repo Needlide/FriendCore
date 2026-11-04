@@ -1,31 +1,44 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
-using FriendCore.Domain.Common;
 using FriendCore.Domain.Users;
+using FriendCore.Domain.Common;
 using MediatR;
 
 namespace FriendCore.Application.Users.Queries.GetPreferences;
 
-internal sealed class GetPreferencesQueryHandler(
-    ICurrentUserService currentUserService,
-    IUserRepository userRepository)
-    : IRequestHandler<GetPreferencesQuery, ErrorOr<PreferencesResponse>>
+internal sealed class GetPreferencesQueryHandler : IRequestHandler<GetPreferencesQuery, ErrorOr<PreferencesResponse>>
 {
-    public async Task<ErrorOr<PreferencesResponse>> Handle(
-        GetPreferencesQuery request,
-        CancellationToken cancellationToken)
+    private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserService _currentUserService;
+
+    public GetPreferencesQueryHandler(ICurrentUserService currentUserService, IUserRepository userRepository)
     {
-        if (currentUserService.UserId is not { } userId)
+        _userRepository = userRepository;
+        _currentUserService = currentUserService;
+    }
+
+    public async Task<ErrorOr<PreferencesResponse>> Handle(GetPreferencesQuery request, CancellationToken cancellationToken)
+    {
+        var userId = _currentUserService.UserId;
+        if (userId is null)
             return CommonErrors.Unauthorized;
 
-        // Same read path as the update handler: ContentPreference lives on User (§5.2),
-        // the accessibility toggles on UserPreferences.
-        var user = await userRepository.GetByIdAsync(userId, cancellationToken);
-        var preferences = await userRepository.GetPreferencesAsync(userId, cancellationToken);
-        if (user is null || preferences is null)
+        var user = await _userRepository.GetByIdAsync(userId.Value, cancellationToken);
+        if (user is null)
             return UserErrors.NotFound;
 
-        return PreferencesResponse.Create(preferences, user.ContentPreference);
+        var preferences = await _userRepository.GetPreferencesAsync(userId.Value, cancellationToken);
+        if (preferences is null)
+            return UserErrors.NotFound;
+
+        return new PreferencesResponse(
+            preferences.HideFlashingMedia,
+            preferences.HideArachnidMedia,
+            preferences.ReduceMotion,
+            preferences.DisableAutoplay,
+            preferences.ReduceVisualNoise,
+            preferences.SendMessageOnEnter,
+            user.ContentPreference.ToString());
     }
 }

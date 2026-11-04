@@ -41,15 +41,16 @@ public class PostCommandHandlerTests
         var mediaFactory = new MediaResponseFactory(
             _mediaRepository,
             Options.Create(new StorageOptions { PublicBaseUrl = "http://storage.test/media" }));
+        var emailOptions = Options.Create(new EmailOptions { RequireVerificationForPosting = true });
         return new(
             _currentUserService, _userRepository, _postRepository, _mediaRepository, _tagRepository,
-            _tagNormalizer, mediaFactory, _dateTimeProvider);
+            _tagNormalizer, mediaFactory, _dateTimeProvider, emailOptions);
     }
 
     private MediaItem ReadyMedia(Ulid? uploaderId = null)
     {
         var media = MediaItem.Create(
-            uploaderId ?? _author.Id, "x.png", "image/png", "png", false, false, Now);
+            uploaderId ?? _author.Id, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         media.MarkReady([
             MediaVariant.Create(
                 MediaVariantType.Medium, MediaStorageKeys.Variant(media.Id, MediaVariantType.Medium), 800, 600, 1000)
@@ -211,7 +212,8 @@ public class PostCommandHandlerTests
     [Fact]
     public async Task Create_WithProcessingMedia_ReturnsNotReady()
     {
-        var processing = MediaItem.Create(_author.Id, "x.png", "image/png", "png", false, false, Now);
+        var processing = MediaItem.Create(
+            _author.Id, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         MediaLookupReturns(processing);
 
         var result = await CreateHandler().Handle(
@@ -300,5 +302,49 @@ public class PostCommandHandlerTests
 
         Assert.False(result.IsError);
         await _postRepository.Received(1).SoftDeleteAsync(post, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_CascadesToCommentsAndLikes_WhenAuthor()
+    {
+        var post = Post.Create(_author.Id, "mine", ContentSensitivity.General, Now).Value;
+        _postRepository.GetByIdAsync(post.Id, Arg.Any<CancellationToken>()).Returns(post);
+
+        var result = await DeleteHandler().Handle(new DeletePostCommand(post.Id), CancellationToken.None);
+
+        Assert.False(result.IsError);
+        await _postRepository.Received(1).StageSoftDeleteCommentsForPostAsync(
+            post.Id, Arg.Any<CancellationToken>());
+        await _postRepository.Received(1).StageRemoveLikesForPostAsync(
+            post.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_DoesNotCascade_WhenNotAuthor()
+    {
+        var post = Post.Create(Ulid.NewUlid(), "someone else's", ContentSensitivity.General, Now).Value;
+        _postRepository.GetByIdAsync(post.Id, Arg.Any<CancellationToken>()).Returns(post);
+
+        var result = await DeleteHandler().Handle(new DeletePostCommand(post.Id), CancellationToken.None);
+
+        Assert.True(result.IsError);
+        await _postRepository.DidNotReceive().StageSoftDeleteCommentsForPostAsync(
+            Arg.Any<Ulid>(), Arg.Any<CancellationToken>());
+        await _postRepository.DidNotReceive().StageRemoveLikesForPostAsync(
+            Arg.Any<Ulid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_DoesNotCascade_WhenMissing()
+    {
+        _postRepository.GetByIdAsync(Arg.Any<Ulid>(), Arg.Any<CancellationToken>()).Returns((Post?)null);
+
+        var result = await DeleteHandler().Handle(new DeletePostCommand(Ulid.NewUlid()), CancellationToken.None);
+
+        Assert.True(result.IsError);
+        await _postRepository.DidNotReceive().StageSoftDeleteCommentsForPostAsync(
+            Arg.Any<Ulid>(), Arg.Any<CancellationToken>());
+        await _postRepository.DidNotReceive().StageRemoveLikesForPostAsync(
+            Arg.Any<Ulid>(), Arg.Any<CancellationToken>());
     }
 }

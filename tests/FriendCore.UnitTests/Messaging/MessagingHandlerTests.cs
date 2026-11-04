@@ -202,7 +202,8 @@ public class MessagingHandlerTests
     }
 
     private MediaItem ReadyMedia(Ulid? uploader = null) =>
-        Ready(MediaItem.Create(uploader ?? _userId, "x.png", "image/png", "png", false, false, Now));
+        Ready(MediaItem.Create(
+            uploader ?? _userId, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now));
 
     private Conversation GivenConversation()
     {
@@ -283,7 +284,8 @@ public class MessagingHandlerTests
     {
         var conversation = GivenConversation();
         // Deliberately not MarkReady — still Processing.
-        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(
+            _userId, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         MediaReturns(media);
 
         var result = await SendHandler().Handle(

@@ -26,6 +26,15 @@ public interface IPostRepository
 
     Task SoftDeleteAsync(Post post, CancellationToken cancellationToken = default);
 
+    // Stages soft-deletes of every live comment on the post WITHOUT saving, so the caller
+    // commits them in the same unit of work as the post's own soft-delete. Already-deleted
+    // comments are left untouched (their original DeletedAt stands).
+    Task StageSoftDeleteCommentsForPostAsync(Ulid postId, CancellationToken cancellationToken = default);
+
+    // Stages hard-removal of every like on the post WITHOUT saving (Like carries no
+    // DeletedAt, so there is nothing to soft-delete). Committed with the post's delete.
+    Task StageRemoveLikesForPostAsync(Ulid postId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Post>> GetByAuthorAsync(
         Ulid authorId,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,

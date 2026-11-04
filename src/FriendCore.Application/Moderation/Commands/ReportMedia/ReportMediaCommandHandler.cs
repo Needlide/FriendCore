@@ -44,7 +44,10 @@ internal sealed class ReportMediaCommandHandler(
         // the safety data. This is also why motion shares that category — it is the one bucket
         // whose report means "gate this now".
         if (request.Category == ReportCategoryInput.FlashingLights)
-            media.FlagSafety(true, true, MediaSafetySource.UserReports, dateTimeProvider.UtcNow);
+            media.FlagSafety(
+                MediaSafetyFlags.From(("flashing", true), ("intenseMotion", true)),
+                MediaSafetySource.UserReports,
+                dateTimeProvider.UtcNow);
 
         // Captured here, while the subject still exists — at review time it may be
 

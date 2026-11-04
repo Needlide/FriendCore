@@ -53,7 +53,13 @@ internal sealed class ModerationService(
                         return ModerationErrors.TargetNotFound;
 
                     if (post.DeletedAt is null)
+                    {
                         postRepository.StageSoftDelete(post);
+                        // Same cascade as an author delete: the removal must not orphan
+                        // comments or likes. Staged — the audit save below commits it all.
+                        await postRepository.StageSoftDeleteCommentsForPostAsync(post.Id, cancellationToken);
+                        await postRepository.StageRemoveLikesForPostAsync(post.Id, cancellationToken);
+                    }
 
                     auditTargetType = ReportTargetType.Post;
                     auditTargetId = post.Id;

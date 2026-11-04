@@ -72,6 +72,52 @@ public class UserLoginFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
     }
 
+    [Fact]
+    public async Task Login_ForSuspendedUser_ReturnsForbidden()
+    {
+        factory.Clock.Reset();
+        var client = factory.CreateClient();
+        var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
+
+        await AuthScenarios.Register(client, email, username);
+        await _scenarios.SuspendUser(email, TimeSpan.FromDays(7));
+
+        var login = await AuthScenarios.LoginByUsername(client, username);
+
+        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_AfterSuspensionExpires_ReturnsOk()
+    {
+        factory.Clock.Reset();
+        var client = factory.CreateClient();
+        var email = AuthScenarios.UniqueEmail();
+        var username = AuthScenarios.NewUsername();
+
+        await AuthScenarios.Register(client, email, username);
+        await _scenarios.SuspendUser(email, TimeSpan.FromDays(7));
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await AuthScenarios.LoginByUsername(client, username)).StatusCode);
+
+        // Advance the controllable clock past SuspendedUntil — IsSuspended compares
+        // against IDateTimeProvider.UtcNow, so login re-opens without any other change.
+        try
+        {
+            factory.Clock.Set(factory.Clock.UtcNow.AddDays(8));
+
+            var login = await AuthScenarios.LoginByUsername(client, username);
+            Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        }
+        finally
+        {
+            factory.Clock.Reset();
+        }
+    }
+
     [Theory]
     [InlineData("", "password123")]
     [InlineData("alice", "")]

@@ -38,29 +38,38 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
     public string? ContentHash { get; private set; }
 
     public MediaStatus Status { get; private set; }
-    public bool HasFlashingWarning { get; private set; }
-    public bool HasIntenseMotionWarning { get; private set; }
+
+    /// <summary>
+    ///     Creator-declared and moderator-applied safety flags, stored as one JSONB dictionary.
+    ///     Keys are flag names ("flashing", "arachnophobia", ...), values are booleans. Additive
+    ///     — flags are only ever set to true, never cleared.
+    /// </summary>
+    public MediaSafetyFlags SafetyFlags { get; private set; } = MediaSafetyFlags.Empty;
+
+    /// <summary>
+    ///     Who last set the safety flags: user self-declaration, a user report, or a moderator.
+    ///     A moderator's decision outranks a later report.
+    /// </summary>
     public MediaSafetySource SafetySource { get; private set; }
-    public DateTimeOffset? SafetyFlaggedAt { get; private set; }
+    public DateTimeOffset? SafetyFlaggedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 
     public IReadOnlyList<MediaVariant> Variants => _variants.AsReadOnly();
 
     public bool IsReady => Status == MediaStatus.Ready;
 
-    // Status starts as Processing; variants are populated later by ProcessMediaJob. A flashing or
-    // intense-motion warning declared at upload time is recorded as a UserSelfMarked safety source.
+    // Status starts as Processing; variants are populated later by ProcessMediaJob. A safety flag
+    // declared at upload time is recorded as a UserSelfMarked safety source.
     public static MediaItem Create(
         Ulid uploaderId,
         string originalFileName,
         string contentType,
         string fileExtension,
-        bool hasFlashingWarning,
-        bool hasIntenseMotionWarning,
+        MediaSafetyFlags safetyFlags,
         DateTimeOffset createdAt,
         string? contentHash = null)
     {
-        var selfDeclared = hasFlashingWarning || hasIntenseMotionWarning;
+        var selfDeclared = safetyFlags.Flags.Values.Any(value => value);
         var id = Ulid.NewUlid();
 
         return new MediaItem(id, createdAt)
@@ -70,8 +79,7 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
             ContentType = contentType,
             OriginalStorageKey = MediaStorageKeys.Original(uploaderId, id, fileExtension),
             Status = MediaStatus.Processing,
-            HasFlashingWarning = hasFlashingWarning,
-            HasIntenseMotionWarning = hasIntenseMotionWarning,
+            SafetyFlags = safetyFlags,
             SafetySource = selfDeclared ? MediaSafetySource.UserSelfMarked : MediaSafetySource.None,
             SafetyFlaggedAt = selfDeclared ? createdAt : null,
             ContentHash = contentHash
@@ -99,15 +107,12 @@ public sealed class MediaItem : AggregateRoot<Ulid>, ISoftDeletable
         Status = MediaStatus.Failed;
     }
 
-    // Records a safety warning from a user report or moderator action. Flags are additive – never
-    // cleared here. A moderator decision is authoritative and is not overwritten by a later report.
-    public void FlagSafety(bool flashing, bool intenseMotion, MediaSafetySource source, DateTimeOffset at)
+    // Records additional safety warnings from a user report or moderator action. Flags are
+    // additive – never cleared here. A moderator decision is authoritative and is not overwritten
+    // by a later report.
+    public void FlagSafety(MediaSafetyFlags additionalFlags, MediaSafetySource source, DateTimeOffset at)
     {
-        if (flashing)
-            HasFlashingWarning = true;
-
-        if (intenseMotion)
-            HasIntenseMotionWarning = true;
+        SafetyFlags = SafetyFlags.Merge(additionalFlags);
 
         if (SafetySource != MediaSafetySource.Moderator)
             SafetySource = source;

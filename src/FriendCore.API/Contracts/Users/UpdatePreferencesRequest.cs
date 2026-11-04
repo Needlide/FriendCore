@@ -4,6 +4,10 @@ namespace FriendCore.API.Contracts.Users;
 
 public sealed record UpdatePreferencesRequest(
     bool HideFlashingMedia,
+    // Non-nullable like the rest of this full-replace contract. Omitting it sends false, which
+    // turns the arachnophobia warning OFF — the permissive direction. Safe only because the SPA
+    // and API ship together; see the SendMessageOnEnter note below.
+    bool HideArachnidMedia,
     bool ReduceMotion,
     bool DisableAutoplay,
     bool ReduceVisualNoise,

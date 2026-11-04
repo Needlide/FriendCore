@@ -62,6 +62,9 @@ internal sealed class ReviewAppealCommandHandler(
                 var post = await postRepository.GetByIdForModerationAsync(action.TargetId, cancellationToken);
                 if (post is { DeletedAt: not null })
                     postRepository.StageRestore(post);
+                // The removal cascade is NOT reversed: likes were hard-deleted and are gone,
+                // and restoring only the comments would bring back a half-thread. The post
+                // returns; its reactions do not. Accepted MVP trade-off.
                 break;
 
             case ModerationActionType.PermanentBan:

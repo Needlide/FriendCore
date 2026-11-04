@@ -104,7 +104,7 @@ public class MediaProcessingFlowTests(FriendCoreApiFactory factory) : IClassFixt
         // in storage, but nothing ever entered the in-memory queue. Backdated past the stuck
         // threshold, the sweeper must pick it up and drive it to Ready.
         var media = MediaItem.Create(
-            Ulid.NewUlid(), "stuck.png", "image/png", "png", false, false,
+            Ulid.NewUlid(), "stuck.png", "image/png", "png", MediaSafetyFlags.Empty,
             DateTimeOffset.UtcNow.AddHours(-1));
 
         using var content = new MemoryStream(TestImages.RealPng(50, 40));

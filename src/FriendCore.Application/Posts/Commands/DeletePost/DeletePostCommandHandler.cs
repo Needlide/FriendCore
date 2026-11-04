@@ -35,6 +35,11 @@ internal sealed class DeletePostCommandHandler(
                 tag.RecordPostRemoved();
         }
 
+        // The post's comments and likes die with it: staged, not saved — SoftDeleteAsync's
+        // SaveChanges commits everything in one unit of work.
+        await postRepository.StageSoftDeleteCommentsForPostAsync(post.Id, cancellationToken);
+        await postRepository.StageRemoveLikesForPostAsync(post.Id, cancellationToken);
+
         await postRepository.SoftDeleteAsync(post, cancellationToken);
         return Result.Success;
     }

@@ -15,7 +15,8 @@ public class MediaRepositoryTests(FriendCoreApiFactory factory) : IClassFixture<
     private static MediaItem NewItem()
     {
         return MediaItem.Create(
-            Ulid.NewUlid(), "photo.jpg", "image/jpeg", "jpg", true, false, Now);
+            Ulid.NewUlid(), "photo.jpg", "image/jpeg", "jpg",
+            MediaSafetyFlags.From(("flashing", true)), Now);
     }
 
     [Fact]
@@ -37,7 +38,7 @@ public class MediaRepositoryTests(FriendCoreApiFactory factory) : IClassFixture<
         Assert.Equal(media.OriginalStorageKey, loaded.OriginalStorageKey);
         Assert.Equal(MediaStatus.Processing, loaded.Status);
         Assert.Equal(MediaSafetySource.UserSelfMarked, loaded.SafetySource);
-        Assert.True(loaded.HasFlashingWarning);
+        Assert.True(loaded.SafetyFlags.IsSet("flashing"));
         Assert.Empty(loaded.Variants);
     }
 

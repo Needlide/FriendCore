@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Media;
@@ -26,16 +27,29 @@ public class MediaUploadFlowTests(FriendCoreApiFactory factory) : IClassFixture<
     private static MultipartFormDataContent Upload(
         byte[] bytes,
         string contentType,
-        bool hasFlashingWarning = false)
+        bool hasFlashingWarning = false) =>
+        UploadWithFlags(bytes, contentType, JsonSerializer.Serialize(new Dictionary<string, bool>
+        {
+            ["flashing"] = hasFlashingWarning,
+            ["intenseMotion"] = false
+        }));
+
+    /// <summary>
+    ///     Builds the form with a raw <c>SafetyFlags</c> value, so a test can send malformed JSON or
+    ///     omit the field entirely. A null value omits it, which is the normal "nothing declared" case.
+    /// </summary>
+    private static MultipartFormDataContent UploadWithFlags(
+        byte[] bytes,
+        string contentType,
+        string? safetyFlagsJson)
     {
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
 
-        return new MultipartFormDataContent
-        {
-            { file, "file", "test-image.bin" },
-            { new StringContent(hasFlashingWarning ? "true" : "false"), "hasFlashingWarning" }
-        };
+        var form = new MultipartFormDataContent { { file, "file", "test-image.bin" } };
+        if (safetyFlagsJson is not null)
+            form.Add(new StringContent(safetyFlagsJson), "SafetyFlags");
+        return form;
     }
 
     [Fact]
@@ -58,7 +72,7 @@ public class MediaUploadFlowTests(FriendCoreApiFactory factory) : IClassFixture<
         var media = await scope.ServiceProvider.GetRequiredService<IMediaRepository>()
             .GetByIdAsync(Ulid.Parse(body.Id));
         Assert.NotNull(media);
-        Assert.True(media.HasFlashingWarning);
+        Assert.True(media.SafetyFlags.IsSet("flashing"));
 
         await using var stored = await factory.Services.GetRequiredService<IStorageService>()
             .DownloadAsync(media.OriginalStorageKey);
@@ -104,6 +118,43 @@ public class MediaUploadFlowTests(FriendCoreApiFactory factory) : IClassFixture<
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("Media.UnsupportedType", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Upload_WithMalformedSafetyFlags_ReturnsBadRequest()
+    {
+        var client = await AuthedClient();
+
+        // A typo in the declaration must fail loudly: silently treating it as "nothing declared"
+        // would drop a hazard the creator explicitly tried to report.
+        var response = await client.PostAsync(
+            "/api/v1/media",
+            UploadWithFlags(TestImages.RealPng(20, 20), "image/png", "{not json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Media.InvalidSafetyFlags", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Upload_WithoutSafetyFlags_DefaultsToNone()
+    {
+        var client = await AuthedClient();
+
+        // The field is optional: an older client that never sends it must still upload, with no
+        // flags recorded rather than an error.
+        var response = await client.PostAsync(
+            "/api/v1/media",
+            UploadWithFlags(TestImages.RealPng(20, 20), "image/png", null));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MediaStatusResponse>();
+
+        using var scope = factory.Services.CreateScope();
+        var media = await scope.ServiceProvider.GetRequiredService<IMediaRepository>()
+            .GetByIdAsync(Ulid.Parse(body!.Id));
+        Assert.NotNull(media);
+        Assert.False(media.SafetyFlags.IsSet("flashing"));
+        Assert.Equal(MediaSafetySource.None, media.SafetySource);
     }
 
     [Fact]

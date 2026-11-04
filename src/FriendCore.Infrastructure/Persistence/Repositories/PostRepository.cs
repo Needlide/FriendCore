@@ -67,6 +67,33 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task StageSoftDeleteCommentsForPostAsync(Ulid postId, CancellationToken cancellationToken = default)
+    {
+        // Named ignore drops the Blocks filter only: a cascade must reach comments by users
+        // the deleter has blocked, or their rows would survive the post. The soft-delete
+        // filter stays on — already-deleted comments keep their original DeletedAt.
+        var comments = await context.Comments
+            .IgnoreQueryFilters([AppDbContext.BlocksFilter])
+            .Where(comment => comment.PostId == postId)
+            .ToListAsync(cancellationToken);
+
+        // Remove converts to a DeletedAt stamp via the SoftDeleteInterceptor at SaveChanges;
+        // no save here — the caller's unit of work commits it with the post.
+        foreach (var comment in comments)
+            context.Comments.Remove(comment);
+    }
+
+    public async Task StageRemoveLikesForPostAsync(Ulid postId, CancellationToken cancellationToken = default)
+    {
+        // Likes carry no DeletedAt and no query filters — a hard remove is the only delete
+        // they have. No save here; the caller's unit of work commits it with the post.
+        var likes = await context.Likes
+            .Where(like => like.PostId == postId)
+            .ToListAsync(cancellationToken);
+
+        context.Likes.RemoveRange(likes);
+    }
+
     public async Task<IReadOnlyList<Post>> GetByAuthorAsync(
         Ulid authorId,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,

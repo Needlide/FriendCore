@@ -3,7 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Users;
+using FriendCore.Infrastructure.Persistence;
 using FriendCore.IntegrationTests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FriendCore.IntegrationTests.Moderation;
 
@@ -74,6 +77,40 @@ public class EnforcementFlowTests(FriendCoreApiFactory factory) : IClassFixture<
 
         var log = await moderator.GetFromJsonAsync<AuditLogResponse>("/api/v1/admin/audit-log");
         Assert.Contains(log!.Entries, e => e.Action == "ContentRemoval" && e.Reason == "violates rule 1");
+    }
+
+    [Fact]
+    public async Task ResolveWithContentRemoval_CascadesToCommentsAndLikes()
+    {
+        // A moderator removal must not orphan comments or likes behind the post's 404 —
+        // same cascade as an author delete.
+        var (author, _, _) = await RegisterUser();
+        var (commenter, _) = await _scenarios.RegisterVerifiedClientAsync();
+        var postId = await CreatePost(author, "remove me with my thread");
+        Assert.Equal(HttpStatusCode.Created, (await commenter.PostAsJsonAsync(
+            $"/api/v1/posts/{postId}/comments", new { content = "a comment" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await commenter.PostAsync($"/api/v1/posts/{postId}/like", content: null)).StatusCode);
+        var id = Ulid.Parse(postId);
+
+        var moderator = await ModeratorClient();
+        var reportId = await ReportAndGetId(commenter, moderator, postId);
+        var resolve = await moderator.PostAsJsonAsync(
+            $"/api/v1/admin/reports/{reportId}/resolve",
+            new { action = "ContentRemoval", reason = "violates rule 1" });
+        Assert.Equal(HttpStatusCode.NoContent, resolve.StatusCode);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var deletedAt = await db.Comments
+            .IgnoreQueryFilters()
+            .Where(comment => comment.PostId == id)
+            .Select(comment => comment.DeletedAt)
+            .SingleAsync();
+        Assert.NotNull(deletedAt);
+
+        Assert.Equal(0, await db.Likes.CountAsync(like => like.PostId == id));
     }
 
     [Fact]

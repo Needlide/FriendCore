@@ -9,7 +9,11 @@ public class MediaItemTests
     private static MediaItem CreateItem(bool flashing = false, bool intenseMotion = false)
     {
         return MediaItem.Create(
-            Ulid.NewUlid(), "photo.jpg", "image/jpeg", "jpg", flashing, intenseMotion, Now);
+            Ulid.NewUlid(), "photo.jpg", "image/jpeg", "jpg",
+            MediaSafetyFlags.From(
+                ("flashing", flashing),
+                ("intenseMotion", intenseMotion)),
+            Now);
     }
 
     private static MediaVariant Variant(MediaVariantType type = MediaVariantType.Thumbnail)
@@ -22,7 +26,8 @@ public class MediaItemTests
     {
         var uploaderId = Ulid.NewUlid();
 
-        var media = MediaItem.Create(uploaderId, "photo.jpg", "image/jpeg", "jpg", false, false, Now);
+        var media = MediaItem.Create(
+            uploaderId, "photo.jpg", "image/jpeg", "jpg", MediaSafetyFlags.Empty, Now);
 
         Assert.Equal(MediaStatus.Processing, media.Status);
         Assert.False(media.IsReady);
@@ -37,8 +42,8 @@ public class MediaItemTests
     {
         var media = CreateItem(flashing: true);
 
-        Assert.True(media.HasFlashingWarning);
-        Assert.False(media.HasIntenseMotionWarning);
+        Assert.True(media.SafetyFlags.IsSet("flashing"));
+        Assert.False(media.SafetyFlags.IsSet("intenseMotion"));
         Assert.Equal(MediaSafetySource.UserSelfMarked, media.SafetySource);
         Assert.Equal(Now, media.SafetyFlaggedAt);
     }
@@ -82,10 +87,13 @@ public class MediaItemTests
     {
         var media = CreateItem(flashing: true);
 
-        media.FlagSafety(false, true, MediaSafetySource.UserReports, Now.AddHours(1));
+        media.FlagSafety(
+            MediaSafetyFlags.From(("flashing", false), ("intenseMotion", true)),
+            MediaSafetySource.UserReports,
+            Now.AddHours(1));
 
-        Assert.True(media.HasFlashingWarning);
-        Assert.True(media.HasIntenseMotionWarning);
+        Assert.True(media.SafetyFlags.IsSet("flashing"));
+        Assert.True(media.SafetyFlags.IsSet("intenseMotion"));
         Assert.Equal(MediaSafetySource.UserReports, media.SafetySource);
         Assert.Equal(Now.AddHours(1), media.SafetyFlaggedAt);
     }
@@ -94,12 +102,18 @@ public class MediaItemTests
     public void FlagSafety_ModeratorDecision_IsNotOverwrittenByLaterReports()
     {
         var media = CreateItem();
-        media.FlagSafety(true, false, MediaSafetySource.Moderator, Now);
+        media.FlagSafety(
+            MediaSafetyFlags.From(("flashing", true)),
+            MediaSafetySource.Moderator,
+            Now);
 
-        media.FlagSafety(false, true, MediaSafetySource.UserReports, Now.AddHours(1));
+        media.FlagSafety(
+            MediaSafetyFlags.From(("intenseMotion", true)),
+            MediaSafetySource.UserReports,
+            Now.AddHours(1));
 
         Assert.Equal(MediaSafetySource.Moderator, media.SafetySource);
-        Assert.True(media.HasIntenseMotionWarning);
+        Assert.True(media.SafetyFlags.IsSet("intenseMotion"));
     }
 
     [Fact]

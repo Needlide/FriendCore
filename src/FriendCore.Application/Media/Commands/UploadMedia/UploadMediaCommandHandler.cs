@@ -48,8 +48,7 @@ internal sealed class UploadMediaCommandHandler(
             request.FileName,
             contentType,
             ImageContentTypes.Extension(contentType),
-            request.HasFlashingWarning,
-            request.HasIntenseMotionWarning,
+            new MediaSafetyFlags(request.SafetyFlags),
             dateTimeProvider.UtcNow,
             contentHash);
 

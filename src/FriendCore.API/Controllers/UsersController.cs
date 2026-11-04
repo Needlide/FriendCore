@@ -1,29 +1,32 @@
+using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Contracts.Tags;
 using FriendCore.API.Contracts.Users;
 using FriendCore.API.Extensions;
+using FriendCore.Application.Moderation.Commands.ReportUser;
 using FriendCore.Application.Tags.Commands.UpdateProfileTags;
 using FriendCore.Application.Tags.Queries.GetMyProfileTags;
-using FriendCore.API.Contracts.Moderation;
-using FriendCore.Application.Moderation.Commands.ReportUser;
 using FriendCore.Application.Users.Commands.BlockUser;
+using FriendCore.Application.Users.Commands.ClearNotificationSnooze;
 using FriendCore.Application.Users.Commands.FollowUser;
 using FriendCore.Application.Users.Commands.MuteUser;
+using FriendCore.Application.Users.Commands.SetNotificationSnooze;
 using FriendCore.Application.Users.Commands.UnblockUser;
 using FriendCore.Application.Users.Commands.UnfollowUser;
 using FriendCore.Application.Users.Commands.UnmuteUser;
 using FriendCore.Application.Users.Commands.UpdateKeywordFilters;
-using FriendCore.Application.Users.Commands.ClearNotificationSnooze;
-using FriendCore.Application.Users.Commands.SetNotificationSnooze;
 using FriendCore.Application.Users.Commands.UpdateNotificationTypes;
-using FriendCore.Application.Users.Queries.GetNotificationSnooze;
 using FriendCore.Application.Users.Commands.UpdatePreferences;
 using FriendCore.Application.Users.Commands.UpdateProfile;
-using FriendCore.Application.Users.Queries.GetKeywordFilters;
-using FriendCore.Application.Users.Queries.GetNotificationTypes;
+using FriendCore.Application.Users.Queries.GetBlocks;
 using FriendCore.Application.Users.Queries.GetFollowers;
 using FriendCore.Application.Users.Queries.GetFollowing;
+using FriendCore.Application.Users.Queries.GetKeywordFilters;
+using FriendCore.Application.Users.Queries.GetMutes;
+using FriendCore.Application.Users.Queries.GetNotificationSnooze;
+using FriendCore.Application.Users.Queries.GetNotificationTypes;
 using FriendCore.Application.Users.Queries.GetPreferences;
 using FriendCore.Application.Users.Queries.GetUserProfile;
+using FriendCore.Application.Users.Queries.GetUserTags;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -69,10 +72,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateProfileTags(
-        [FromBody] UpdateProfileTagsRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateTags(UpdateProfileTagsRequest request, CancellationToken cancellationToken)
     {
         var tags = request.Tags
             .Select(tag => new ProfileTagInput(tag.Name, tag.Tier, tag.IsPublic))
@@ -86,7 +86,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     [Authorize]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetMyProfileTags(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTags(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetMyProfileTagsQuery(), cancellationToken);
         return result.ToActionResult();
@@ -98,6 +98,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Follow(string username, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new FollowUserCommand(username), cancellationToken);
@@ -115,6 +116,60 @@ public sealed class UsersController(ISender sender) : ControllerBase
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
+    [HttpPost("{username}/block")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Block(
+        string username,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)]
+        BlockUserRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new BlockUserCommand(username, request?.Confirmed ?? false),
+            cancellationToken);
+
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpDelete("{username}/block")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unblock(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UnblockUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPost("{username}/mute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Mute(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new MuteUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpDelete("{username}/mute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unmute(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new UnmuteUserCommand(username), cancellationToken);
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
     [HttpPatch("me/preferences")]
     [Authorize]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
@@ -127,6 +182,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
         var result = await sender.Send(
             new UpdatePreferencesCommand(
                 request.HideFlashingMedia,
+                request.HideArachnidMedia,
                 request.ReduceMotion,
                 request.DisableAutoplay,
                 request.ReduceVisualNoise,
@@ -183,6 +239,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     [HttpPatch("me/notification-types")]
     [Authorize]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> UpdateNotificationTypes(
         [FromBody] UpdateNotificationTypesRequest request,
@@ -225,62 +282,9 @@ public sealed class UsersController(ISender sender) : ControllerBase
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
-    [HttpPost("{username}/block")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Block(
-        string username,
-        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BlockUserRequest? request,
-        CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(
-            new BlockUserCommand(username, request?.Confirmed ?? false),
-            cancellationToken);
-
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
-    }
-
-    [HttpDelete("{username}/block")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Unblock(string username, CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(new UnblockUserCommand(username), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
-    }
-
-    [HttpPost("{username}/mute")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Mute(string username, CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(new MuteUserCommand(username), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
-    }
-
-    [HttpDelete("{username}/mute")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Unmute(string username, CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(new UnmuteUserCommand(username), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
-    }
-
     [HttpPost("{username}/report")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -291,7 +295,38 @@ public sealed class UsersController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(
             new ReportUserCommand(username, request.Category, request.Note), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : Accepted();
+    }
+
+    [HttpGet("me/blocks")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetBlocks(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetBlocksQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("me/mutes")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMutes(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMutesQuery(), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("{username}/tags")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserTags(string username, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetUserTagsQuery(username), cancellationToken);
+        return result.ToActionResult();
     }
 
     [HttpGet("{username}/followers")]

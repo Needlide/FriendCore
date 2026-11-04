@@ -67,6 +67,39 @@ public class FollowFlowTests(FriendCoreApiFactory factory) : IClassFixture<Frien
     }
 
     [Fact]
+    public async Task FollowLists_ReportFollowState_ForTheViewer()
+    {
+        // Follower/following rows used to render a neutral "Follow" even for users the
+        // viewer already follows — the list payload carried no relationship to seed from.
+        var aUsername = AuthScenarios.NewUsername();
+        var bUsername = AuthScenarios.NewUsername();
+        var cUsername = AuthScenarios.NewUsername();
+        var aClient = await RegisterClient(aUsername);
+        var cClient = await RegisterClient(cUsername);
+        await RegisterUser(bUsername);
+
+        // C follows B; A follows C. From A's view: B's follower C is followed, and A's
+        // own following C is followed too.
+        await cClient.PostAsync($"/api/v1/users/{bUsername}/follow", content: null);
+        await aClient.PostAsync($"/api/v1/users/{cUsername}/follow", content: null);
+
+        var bFollowers = await aClient.GetFromJsonAsync<FollowListResponse>(
+            $"/api/v1/users/{bUsername}/followers");
+        var carol = Assert.Single(bFollowers!.Users, u => u.Username == cUsername);
+        Assert.True(carol.IsFollowedByViewer);
+
+        var aFollowing = await aClient.GetFromJsonAsync<FollowListResponse>(
+            $"/api/v1/users/{aUsername}/following");
+        var followed = Assert.Single(aFollowing!.Users, u => u.Username == cUsername);
+        Assert.True(followed.IsFollowedByViewer);
+
+        // Unfollowed rows stay false: A does not follow B.
+        var bProfile = await aClient.GetFromJsonAsync<UserProfileResponse>(
+            $"/api/v1/users/{bUsername}");
+        Assert.False(bProfile!.IsFollowedByViewer);
+    }
+
+    [Fact]
     public async Task Follow_IsIdempotent()
     {
         var aClient = await RegisterClient(AuthScenarios.NewUsername());

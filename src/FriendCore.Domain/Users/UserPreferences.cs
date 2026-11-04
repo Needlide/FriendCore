@@ -20,6 +20,14 @@ public sealed class UserPreferences
 
     public Ulid UserId { get; private set; }
     public bool HideFlashingMedia { get; private set; } = true;
+
+    /// <summary>
+    ///     True (the default) makes the client ask before showing media flagged with the
+    ///     arachnophobia hazard. Opt-out, like <see cref="HideFlashingMedia" />: switching it
+    ///     off is a deliberate "show me anyway", so the client can auto-reveal.
+    /// </summary>
+    public bool HideArachnidMedia { get; private set; } = true;
+
     public bool ReduceMotion { get; private set; }
     public bool DisableAutoplay { get; private set; } = true;
     public bool ReduceVisualNoise { get; private set; }
@@ -45,12 +53,14 @@ public sealed class UserPreferences
 
     public void UpdateAccessibility(
         bool hideFlashingMedia,
+        bool hideArachnidMedia,
         bool reduceMotion,
         bool disableAutoplay,
         bool reduceVisualNoise,
         DateTimeOffset now)
     {
         HideFlashingMedia = hideFlashingMedia;
+        HideArachnidMedia = hideArachnidMedia;
         ReduceMotion = reduceMotion;
         DisableAutoplay = disableAutoplay;
         ReduceVisualNoise = reduceVisualNoise;
@@ -59,7 +69,7 @@ public sealed class UserPreferences
 
     /// <summary>
     ///     Chat composer behaviour. Deliberately NOT folded into
-    ///     <see cref="UpdateAccessibility" />: that method's four flags all describe how the
+    ///     <see cref="UpdateAccessibility" />: that method's flags all describe how the
     ///     app presents itself to the person using it, and a send-key binding is a different
     ///     kind of setting — it belongs to the composer, not to accessibility. Sharing one
     ///     method would also have made the accessibility group's name a lie.

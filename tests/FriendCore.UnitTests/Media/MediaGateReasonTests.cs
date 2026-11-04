@@ -11,10 +11,21 @@ public class MediaGateReasonTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 3, 9, 0, 0, TimeSpan.Zero);
 
-    private static MediaItem Media(string contentType, bool flashing, bool motion)
+    private static MediaItem Media(
+        string contentType,
+        bool flashing,
+        bool motion,
+        bool arachnophobia = false,
+        bool explicitContent = false)
     {
         var media = MediaItem.Create(
-            Ulid.NewUlid(), "x.gif", contentType, ".gif", flashing, motion, Now);
+            Ulid.NewUlid(), "x.gif", contentType, ".gif",
+            MediaSafetyFlags.From(
+                ("flashing", flashing),
+                ("intenseMotion", motion),
+                ("arachnophobia", arachnophobia),
+                ("explicit", explicitContent)),
+            Now);
         media.MarkReady(
             [MediaVariant.Create(MediaVariantType.Small, $"{media.Id}/small.webp", 320, 240, 1024)]);
         return media;
@@ -51,6 +62,29 @@ public class MediaGateReasonTests
         // readers are not left unprotected by a technicality about animation.
         var media = Media("image/jpeg", true, true);
         Assert.Equal(MediaGateReason.Flashing, MediaResponse.GateReasonFor(media));
+        Assert.Empty(MediaResponse.Create(media, "https://cdn").Variants);
+    }
+
+    [Theory]
+    [InlineData("image/png", false, false, true, false, MediaGateReason.Arachnophobia)]
+    [InlineData("image/png", false, false, false, true, MediaGateReason.Explicit)]
+    [InlineData("image/gif", false, false, true, true, MediaGateReason.Arachnophobia)]
+    [InlineData("image/png", true, false, true, true, MediaGateReason.Flashing)]
+    [InlineData("image/gif", false, true, true, true, MediaGateReason.IntenseMotion)]
+    public void ConsentHazardsGate_InPriorityOrder(
+        string contentType,
+        bool flashing,
+        bool motion,
+        bool arachnophobia,
+        bool explicitContent,
+        MediaGateReason expected)
+    {
+        // Arachnophobia and explicit content are consent gates, not photosensitivity hazards.
+        // They gate on their own, and never displace a harder hazard: an image that flashes is
+        // labelled as flashing even when it is also explicit.
+        var media = Media(contentType, flashing, motion, arachnophobia, explicitContent);
+
+        Assert.Equal(expected, MediaResponse.GateReasonFor(media));
         Assert.Empty(MediaResponse.Create(media, "https://cdn").Variants);
     }
 

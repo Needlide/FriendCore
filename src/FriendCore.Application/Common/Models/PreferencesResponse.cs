@@ -4,6 +4,7 @@ namespace FriendCore.Application.Common.Models;
 
 public sealed record PreferencesResponse(
     bool HideFlashingMedia,
+    bool HideArachnidMedia,
     bool ReduceMotion,
     bool DisableAutoplay,
     bool ReduceVisualNoise,
@@ -13,6 +14,7 @@ public sealed record PreferencesResponse(
     public static PreferencesResponse Create(UserPreferences preferences, ContentPreference contentPreference) =>
         new(
             preferences.HideFlashingMedia,
+            preferences.HideArachnidMedia,
             preferences.ReduceMotion,
             preferences.DisableAutoplay,
             preferences.ReduceVisualNoise,

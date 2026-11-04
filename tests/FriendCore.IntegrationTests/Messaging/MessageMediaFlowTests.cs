@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FriendCore.Application.Common.Models;
 using FriendCore.IntegrationTests.Infrastructure;
 using FriendCore.IntegrationTests.Media;
@@ -25,8 +26,14 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
         var form = new MultipartFormDataContent
         {
             { file, "file", "image.png" },
-            { new StringContent(flashing.ToString()), "HasFlashingWarning" },
-            { new StringContent("False"), "HasIntenseMotionWarning" }
+            {
+                new StringContent(JsonSerializer.Serialize(new Dictionary<string, bool>
+                {
+                    ["flashing"] = flashing,
+                    ["intenseMotion"] = false
+                })),
+                "SafetyFlags"
+            }
         };
 
         var response = await client.PostAsync("/api/v1/media", form);
@@ -240,7 +247,7 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
             $"/api/v1/conversations/{conversation.Id}/messages");
         var bubble = feed!.Messages.Single(m => m.Media?.Id == mediaId);
         Assert.Empty(bubble.Media!.Variants);
-        Assert.True(bubble.Media.HasFlashingWarning);
+        Assert.True(bubble.Media.SafetyFlags["flashing"]);
 
         // Consent, from a conversation participant, succeeds.
         var reveal = await bob.PostAsync($"/api/v1/media/{mediaId}/reveal", content: null);

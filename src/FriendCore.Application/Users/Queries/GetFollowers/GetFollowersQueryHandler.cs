@@ -20,7 +20,7 @@ internal sealed class GetFollowersQueryHandler(
             return UserErrors.NotFound;
 
         var followers = await followRepository.GetFollowersAsync(user.Id, MaxResults, cancellationToken);
-        var users = followers.Select(UserSummaryResponse.FromUser).ToList();
+        var users = followers.Select(u => UserSummaryResponse.FromUser(u)).ToList();
         return new FollowListResponse(users);
     }
 }

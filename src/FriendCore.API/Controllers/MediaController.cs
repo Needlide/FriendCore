@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FriendCore.API.Contracts.Media;
 using FriendCore.API.Contracts.Moderation;
 using FriendCore.API.Extensions;
@@ -18,6 +19,9 @@ namespace FriendCore.API.Controllers;
 [EnableRateLimiting(RateLimitingExtensions.ApiPolicy)]
 public sealed class MediaController(ISender sender) : ControllerBase
 {
+    private static readonly JsonSerializerOptions SafetyFlagsJson =
+        new(JsonSerializerDefaults.Web);
+
     [HttpPost]
     [Authorize]
     // App-level validation rejects > 20MB with a clean 400; this just caps the request pipe with
@@ -34,17 +38,52 @@ public sealed class MediaController(ISender sender) : ControllerBase
         // validator (error shapes stay consistent with every other endpoint).
         await using var content = request.File?.OpenReadStream() ?? Stream.Null;
 
+        if (!TryParseSafetyFlags(request.SafetyFlags, out var safetyFlags))
+            return new BadRequestObjectResult(new List<ErrorOr.Error>
+            {
+                ErrorOr.Error.Validation(
+                    "Media.InvalidSafetyFlags",
+                    "SafetyFlags must be a JSON object of flag names to booleans.")
+            });
+
         var result = await sender.Send(
             new UploadMediaCommand(
                 content,
                 request.File?.Length ?? 0,
                 request.File?.FileName ?? string.Empty,
                 request.File?.ContentType ?? string.Empty,
-                request.HasFlashingWarning,
-                request.HasIntenseMotionWarning),
+                safetyFlags),
             cancellationToken);
 
         return result.ToCreatedResult();
+    }
+
+    /// <summary>
+    ///     Parses the single <c>SafetyFlags</c> form field. Missing/blank means "nothing declared",
+    ///     which is the normal case. Malformed JSON is rejected rather than treated as empty — a
+    ///     typo must not silently drop a safety declaration.
+    /// </summary>
+    private static bool TryParseSafetyFlags(
+        string? json,
+        out IReadOnlyDictionary<string, bool> flags)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            flags = new Dictionary<string, bool>();
+            return true;
+        }
+
+        try
+        {
+            flags = JsonSerializer.Deserialize<Dictionary<string, bool>>(json, SafetyFlagsJson)
+                ?? new Dictionary<string, bool>();
+            return true;
+        }
+        catch (JsonException)
+        {
+            flags = new Dictionary<string, bool>();
+            return false;
+        }
     }
 
     [HttpGet("{id}/status")]

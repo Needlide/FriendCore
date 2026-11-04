@@ -59,9 +59,10 @@ internal sealed class RevealMediaCommandHandler(
 
     private async Task<bool> MaySeeAsync(MediaItem media, Ulid userId, CancellationToken cancellationToken)
     {
-        // An unflagged item was never withheld, so there is nothing to authorize — refusing it
-        // here would break the ordinary path for no privacy gain.
-        if (!media.HasFlashingWarning && !media.HasIntenseMotionWarning)
+        // An ungated item was never withheld, so there is nothing to authorize — refusing it
+        // here would break the ordinary path for no privacy gain. Using the same classifier as
+        // the response keeps this in step with every hazard that can withhold a URL.
+        if (MediaResponse.GateReasonFor(media) == MediaGateReason.None)
             return true;
 
         // Your own upload: needed so a draft's flagged image is still previewable, and the

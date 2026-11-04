@@ -64,6 +64,31 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task Unlike_IsIdempotent()
+    {
+        var client = await AuthedClient();
+        var postId = await CreatePost(client);
+
+        // Unliking a post you never liked is a no-op but still reports stable state.
+        var first = await client.DeleteAsync($"/api/v1/posts/{postId}/like");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstBody = await first.Content.ReadFromJsonAsync<PostLikeResponse>();
+        Assert.False(firstBody!.Liked);
+        Assert.Equal(0, firstBody.LikeCount);
+
+        await client.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+        await client.DeleteAsync($"/api/v1/posts/{postId}/like");
+        var second = await client.DeleteAsync($"/api/v1/posts/{postId}/like");
+
+        var secondBody = await second.Content.ReadFromJsonAsync<PostLikeResponse>();
+        Assert.False(secondBody!.Liked);
+        Assert.Equal(0, secondBody.LikeCount);
+
+        var post = await client.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
+        Assert.Equal(0, post!.LikeCount);
+    }
+
+    [Fact]
     public async Task AddComment_ThenList_ThenDelete_UpdatesCount()
     {
         var client = await AuthedClient();

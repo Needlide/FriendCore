@@ -24,4 +24,11 @@ public sealed class EmailOptions
     public string ResetBaseUrl { get; init; } = "http://localhost:3000";
 
     public int ResetTokenExpirationHours { get; init; } = 2;
+
+    /// <summary>
+    ///     When true, only verified users may create posts. Set to false in development
+    ///     where no email service is configured; set to true when Resend is configured
+    ///     and you want the verification gate enforced.
+    /// </summary>
+    public bool RequireVerificationForPosting { get; init; } = true;
 }

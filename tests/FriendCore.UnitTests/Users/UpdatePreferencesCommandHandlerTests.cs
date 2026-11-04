@@ -33,7 +33,7 @@ public class UpdatePreferencesCommandHandlerTests
         _currentUserService.UserId.Returns((Ulid?)null);
 
         var result = await CreateHandler().Handle(
-            new UpdatePreferencesCommand(true, false, true, false, true, UserContentPreference.General),
+            new UpdatePreferencesCommand(true, true, false, true, false, true, UserContentPreference.General),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -46,6 +46,7 @@ public class UpdatePreferencesCommandHandlerTests
         var result = await CreateHandler().Handle(
             new UpdatePreferencesCommand(
                 HideFlashingMedia: false,
+                HideArachnidMedia: false,
                 ReduceMotion: true,
                 DisableAutoplay: false,
                 ReduceVisualNoise: true,
@@ -56,6 +57,7 @@ public class UpdatePreferencesCommandHandlerTests
         Assert.False(result.IsError);
         Assert.Equal(ContentPreference.Explicit, _user.ContentPreference);
         Assert.False(_preferences.HideFlashingMedia);
+        Assert.False(_preferences.HideArachnidMedia);
         Assert.True(_preferences.ReduceMotion);
         Assert.False(_preferences.DisableAutoplay);
         Assert.True(_preferences.ReduceVisualNoise);
@@ -70,7 +72,7 @@ public class UpdatePreferencesCommandHandlerTests
         // The response is what the composer reads, so a preference that saved but did not come
         // back would leave the composer disagreeing with the settings page until a reload.
         var result = await CreateHandler().Handle(
-            new UpdatePreferencesCommand(true, false, true, false, false, UserContentPreference.General),
+            new UpdatePreferencesCommand(true, true, false, true, false, false, UserContentPreference.General),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -85,7 +87,7 @@ public class UpdatePreferencesCommandHandlerTests
         _preferences.UpdateComposer(false, Now.AddDays(-1));
 
         var result = await CreateHandler().Handle(
-            new UpdatePreferencesCommand(true, false, true, false, false, UserContentPreference.General),
+            new UpdatePreferencesCommand(true, true, false, true, false, false, UserContentPreference.General),
             CancellationToken.None);
 
         Assert.False(result.IsError);

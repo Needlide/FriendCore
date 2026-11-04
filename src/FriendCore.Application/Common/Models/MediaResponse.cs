@@ -6,9 +6,8 @@ public sealed record MediaVariantResponse(string Type, string Url, int WidthPx, 
 
 /// <summary>
 /// Why the server withheld this media's URLs (§7.4). Sent instead of making the client work it
-/// out from the two booleans — the whole point of moving the gate server-side was to stop each
-/// surface re-deriving the decision, and deriving <em>why</em> client-side would reintroduce
-/// exactly that.
+/// out from the flags — the whole point of moving the gate server-side was to stop each surface
+/// re-deriving the decision, and deriving <em>why</em> client-side would reintroduce exactly that.
 /// </summary>
 /// <remarks>
 ///     The enum stays internal to the application layer; the wire value is a string, matching
@@ -29,7 +28,19 @@ public enum MediaGateReason
     IntenseMotion = 2,
 
     /// <summary>Both apply.</summary>
-    FlashingAndIntenseMotion = 3
+    FlashingAndIntenseMotion = 3,
+
+    /// <summary>
+    /// Arachnophobia hazard: spiders or other arachnids. Gated for every reader, with
+    /// <c>HideArachnidMedia</c> (default true) deciding whether the client asks first.
+    /// </summary>
+    Arachnophobia = 4,
+
+    /// <summary>
+    /// Explicit content. Gated for every reader; a reader whose <c>ContentPreference</c> is
+    /// <c>Explicit</c> has already consented, so the client auto-reveals for them.
+    /// </summary>
+    Explicit = 5
 }
 
 /// <summary>
@@ -38,7 +49,8 @@ public enum MediaGateReason
 /// </summary>
 /// <remarks>
 ///     FLAGGED MEDIA CARRIES NO URLS. <see cref="Create" /> withholds the variant list for anything
-///     declared or flagged as flashing / intense-motion (§7.4), on every surface, unconditionally.
+///     carrying a gating safety flag — flashing, intense motion on animated media, arachnophobia,
+///     or explicit content (§7.4) — on every surface, unconditionally.
 ///     A client gets the flags and an empty <c>Variants</c>, and must call
 ///     <c>POST /media/{id}/reveal</c> to obtain the URLs — which is authorized server-side against
 ///     whatever the media is actually attached to.
@@ -51,14 +63,13 @@ public enum MediaGateReason
 /// <para>
 ///     What it does NOT do: revoke access. Variant URLs are public and unsigned
 ///     (<c>StorageOptions.PublicBaseUrl</c> + key), so anyone who already holds one keeps it. The
-///     guarantee is that the API never <em>issues</em> a flagged image's location without consent —
+///     guarantee is that the API never <em>issues</em> the flagged image's location without consent —
 ///     not that the bytes are unreachable. Closing that gap means signed variant URLs or a proxy,
 ///     both of which are a storage-layer project, not an API one.
 /// </remarks>
 public sealed record MediaResponse(
     string Id,
-    bool HasFlashingWarning,
-    bool HasIntenseMotionWarning,
+    IReadOnlyDictionary<string, bool> SafetyFlags,
     IReadOnlyList<MediaVariantResponse> Variants,
     string? GateReason = null)
 {
@@ -81,8 +92,7 @@ public sealed record MediaResponse(
         if (!includeVariants && reason != MediaGateReason.None)
             return new MediaResponse(
                 media.Id.ToString(),
-                media.HasFlashingWarning,
-                media.HasIntenseMotionWarning,
+                media.SafetyFlags.Flags,
                 [],
                 reason.ToString());
 
@@ -98,8 +108,7 @@ public sealed record MediaResponse(
 
         return new MediaResponse(
             media.Id.ToString(),
-            media.HasFlashingWarning,
-            media.HasIntenseMotionWarning,
+            media.SafetyFlags.Flags,
             variants,
             // Null rather than "None": absence is the common case and null is the honest
             // representation of it, so a client can test `gateReason` for truthiness.
@@ -112,31 +121,36 @@ public sealed record MediaResponse(
     /// <remarks>
     /// Intense motion counts ONLY for animated media. <c>image/gif</c> is the sole animated format
     /// the API accepts (§7.1) — a JPEG, PNG or WebP still cannot contain movement, so the flag on a
-    /// still is noise and must not gate anything. This is what finally gives the second flag
-    /// meaning: previously both flags collapsed behind <c>HideFlashingMedia</c>, which mis-filed a
-    /// motion declaration as a seizure risk and left <c>ReduceMotion</c> with nothing to do.
+    /// still is noise and must not gate anything.
     /// <para>
-    /// Practical note: the single self-declaration checkbox sets BOTH flags, so in practice a
-    /// declared still is gated by the flashing branch anyway. The distinction shows up when a
-    /// report or a moderator sets only one — a flagged GIF for motion should gate, and a
-    /// motion-flagged JPEG should not.
+    /// Practical note: the single self-declaration checkbox sets BOTH the flashing and intense-motion
+    /// flags, so in practice a declared still is gated by the flashing branch anyway. The distinction
+    /// shows up when a report or a moderator sets only one — a flagged GIF for motion should gate,
+    /// and a motion-flagged JPEG should not.
+    /// </para>
+    /// <para>
+    /// Arachnophobia and explicit content are consent gates, not photosensitivity hazards. They
+    /// are ordered last and one at a time: the reader is asked about the most specific hazard
+    /// first, and a flashing image never hides behind an "explicit content" label.
+    /// </para>
     /// </remarks>
     internal static MediaGateReason GateReasonFor(MediaItem media)
     {
-        var flashing = media.HasFlashingWarning;
+        var flashing = media.SafetyFlags.IsSet("flashing");
 
         // ContentType is the stored upload type, so this is the ORIGINAL's format. Animated GIFs
         // keep that type; the derived variants are all WebP and would lose the distinction.
         var animated = media.ContentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase);
-        var motion = media.HasIntenseMotionWarning && animated;
+        var motion = media.SafetyFlags.IsSet("intenseMotion") && animated;
 
-        return (flashing, motion) switch
-        {
-            (true, true) => MediaGateReason.FlashingAndIntenseMotion,
-            (true, false) => MediaGateReason.Flashing,
-            (false, true) => MediaGateReason.IntenseMotion,
-            _ => MediaGateReason.None
-        };
+        if (flashing && motion) return MediaGateReason.FlashingAndIntenseMotion;
+        if (flashing) return MediaGateReason.Flashing;
+        if (motion) return MediaGateReason.IntenseMotion;
+
+        if (media.SafetyFlags.IsSet("arachnophobia")) return MediaGateReason.Arachnophobia;
+        if (media.SafetyFlags.IsSet("explicit")) return MediaGateReason.Explicit;
+
+        return MediaGateReason.None;
     }
 
     /// <summary>

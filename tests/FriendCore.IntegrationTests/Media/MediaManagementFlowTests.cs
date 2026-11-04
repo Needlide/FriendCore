@@ -81,8 +81,8 @@ public class MediaManagementFlowTests(FriendCoreApiFactory factory) : IClassFixt
         using var scope = factory.Services.CreateScope();
         var media = await scope.ServiceProvider.GetRequiredService<IMediaRepository>()
             .GetByIdAsync(Ulid.Parse(mediaId));
-        Assert.True(media!.HasFlashingWarning);
-        Assert.True(media.HasIntenseMotionWarning);
+        Assert.True(media!.SafetyFlags.IsSet("flashing"));
+        Assert.True(media.SafetyFlags.IsSet("intenseMotion"));
         Assert.Equal(MediaSafetySource.UserReports, media.SafetySource);
     }
 

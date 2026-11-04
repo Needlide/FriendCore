@@ -54,7 +54,12 @@ public class MediaContentHashAndQueueTests
     {
         var content = new MemoryStream(bytes);
         return Handler().Handle(
-            new UploadMediaCommand(content, content.Length, "photo.png", contentType, false, false),
+            new UploadMediaCommand(
+                content,
+                content.Length,
+                "photo.png",
+                contentType,
+                new Dictionary<string, bool>()),
             CancellationToken.None);
     }
 
@@ -144,7 +149,7 @@ public class MediaContentHashAndQueueTests
         // cannot be backfilled. Null means "unknown" — a consumer must treat it as never-matching,
         // not as a shared value.
         var media = MediaItem.Create(
-            Ulid.NewUlid(), "old.png", "image/png", "png", false, false, Now);
+            Ulid.NewUlid(), "old.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
 
         Assert.Null(media.ContentHash);
     }

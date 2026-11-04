@@ -47,14 +47,6 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<bool>("HasFlashingWarning")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_flashing_warning");
-
-                    b.Property<bool>("HasIntenseMotionWarning")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_intense_motion_warning");
-
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -70,6 +62,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("SafetyFlaggedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("safety_flagged_at");
+
+                    b.Property<string>("SafetyFlags")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safety_flags");
 
                     b.Property<string>("SafetySource")
                         .IsRequired()
@@ -1016,6 +1013,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.Property<bool>("DisableAutoplay")
                         .HasColumnType("boolean")
                         .HasColumnName("disable_autoplay");
+
+                    b.Property<bool>("HideArachnidMedia")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hide_arachnid_media");
 
                     b.Property<bool>("HideFlashingMedia")
                         .HasColumnType("boolean")

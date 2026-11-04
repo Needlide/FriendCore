@@ -1,5 +1,7 @@
+using System.Text.Json;
 using FriendCore.Domain.Media;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FriendCore.Infrastructure.Persistence.Configurations;
@@ -42,8 +44,25 @@ public sealed class MediaItemConfiguration : IEntityTypeConfiguration<MediaItem>
             .HasConversion<string>()
             .HasMaxLength(16);
 
-        builder.Property(media => media.HasFlashingWarning).HasColumnName("has_flashing_warning");
-        builder.Property(media => media.HasIntenseMotionWarning).HasColumnName("has_intense_motion_warning");
+        builder.Property(media => media.SafetyFlags)
+            .HasColumnName("safety_flags")
+            .HasColumnType("jsonb")
+            .HasConversion(
+                flags => JsonSerializer.Serialize(
+                    flags.Flags,
+                    (JsonSerializerOptions?)null),
+                json => new MediaSafetyFlags(
+                    JsonSerializer.Deserialize<Dictionary<string, bool>>(
+                        json,
+                        (JsonSerializerOptions?)null)
+                    ?? new Dictionary<string, bool>()),
+                new ValueComparer<MediaSafetyFlags>(
+                    (left, right) => SameFlags(left, right),
+                    flags => flags.Flags.Aggregate(
+                        0,
+                        (hash, pair) => HashCode.Combine(hash, pair.Key, pair.Value)),
+                    flags => new MediaSafetyFlags(
+                        new Dictionary<string, bool>(flags.Flags))));
 
         builder.Property(media => media.SafetySource)
             .HasColumnName("safety_source")
@@ -95,5 +114,20 @@ public sealed class MediaItemConfiguration : IEntityTypeConfiguration<MediaItem>
         // EF stores MediaStatus as its integer value, and filtering a partial index on another
         // column's state would bake that integer into the schema.
         builder.HasIndex(media => media.ContentHash);
+    }
+
+    /// <summary>
+    ///     Structural equality for the JSON-backed dictionary. The record's generated equality
+    ///     compares the dictionary by reference, so without this EF would treat two equal flag
+    ///     sets as different values and write a pointless UPDATE on every save.
+    /// </summary>
+    private static bool SameFlags(MediaSafetyFlags? left, MediaSafetyFlags? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left is null || right is null) return false;
+        if (left.Flags.Count != right.Flags.Count) return false;
+
+        return left.Flags.All(pair =>
+            right.Flags.TryGetValue(pair.Key, out var value) && value == pair.Value);
     }
 }

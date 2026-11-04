@@ -155,18 +155,40 @@ try
 
     var app = builder.Build();
 
-    if (app.Environment.IsDevelopment())
+    // Database bootstrapping.
+    //
+    // Development keeps the historical convenience of migrating on boot. Deployed environments
+    // opt in explicitly (Database:MigrateOnStartup), so a production start never silently changes
+    // the schema. `--migrate` and `--seed-demo` are one-off commands for `heroku run` / CI: they
+    // do the work and exit without starting the web server.
+    var migrateCommand = args.Contains("--migrate");
+    var seedCommand = args.Contains("--seed-demo");
+    var runMigrations = migrateCommand || seedCommand
+                        || app.Configuration.GetValue<bool>(
+                            "Database:MigrateOnStartup", app.Environment.IsDevelopment());
+
+    if (runMigrations)
         try
         {
             await using var scope = app.Services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
             Log.Information("Database migrations applied");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!migrateCommand && !seedCommand)
         {
+            // Dev convenience only. An explicit one-off command must fail loudly instead.
             Log.Warning(ex,
                 "Database migration skipped — ensure PostgreSQL is running (docker-compose -f docker-compose.dev.yml up -d)");
         }
+
+    if (seedCommand || app.Configuration.GetValue<bool>("Seeding:DemoData"))
+        await DemoDataSeeder.SeedAsync(app.Services);
+
+    if (migrateCommand || seedCommand)
+    {
+        Log.Information("One-off database command finished; not starting the web server.");
+        return;
+    }
 
     // Must run first: rewrites RemoteIpAddress/scheme from X-Forwarded-* before anything reads them.
     app.UseForwardedHeaders();

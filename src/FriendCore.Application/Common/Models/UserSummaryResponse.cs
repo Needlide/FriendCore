@@ -6,10 +6,11 @@ public sealed record UserSummaryResponse(
     string UserId,
     string Username,
     string DisplayName,
-    bool IsVerified)
+    bool IsVerified,
+    bool IsFollowedByViewer = false)
 {
-    public static UserSummaryResponse FromUser(User user) =>
-        new(user.Id.ToString(), user.Username, user.DisplayName, user.IsVerified);
+    public static UserSummaryResponse FromUser(User user, bool isFollowedByViewer = false) =>
+        new(user.Id.ToString(), user.Username, user.DisplayName, user.IsVerified, isFollowedByViewer);
 }
 
 public sealed record FollowListResponse(IReadOnlyList<UserSummaryResponse> Users);

@@ -157,6 +157,16 @@ VALUES ({id.ToString()}, {authorId.ToString()}, {$"tied post {i}"}, {"General"},
         await db.SaveChangesAsync();
     }
 
+    public async Task SuspendUser(string email, TimeSpan duration)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.EmailHash == EmailHash(email));
+        var now = factory.Clock.UtcNow;
+        user.Suspend(now.Add(duration), now);
+        await db.SaveChangesAsync();
+    }
+
     // No tag-moderation endpoint yet; approve directly so autocomplete (Active-only) can be exercised.
     public async Task ApproveTagAsync(string slug)
     {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FriendCore.Application.Common.Models;
 using FriendCore.IntegrationTests.Infrastructure;
 using FriendCore.IntegrationTests.Media;
@@ -29,8 +30,14 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         var form = new MultipartFormDataContent
         {
             { file, "file", "image.png" },
-            { new StringContent(flashing.ToString()), "HasFlashingWarning" },
-            { new StringContent(intenseMotion.ToString()), "HasIntenseMotionWarning" }
+            {
+                new StringContent(JsonSerializer.Serialize(new Dictionary<string, bool>
+                {
+                    ["flashing"] = flashing,
+                    ["intenseMotion"] = intenseMotion
+                })),
+                "SafetyFlags"
+            }
         };
 
         var response = await client.PostAsync("/api/v1/media", form);
@@ -196,7 +203,7 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         // The gate: no URLs at all, so the browser cannot be handed a location to fetch. The flags
         // still ship, so the client can explain WHY there is no image.
         Assert.Empty(byId[flashing].Variants);
-        Assert.True(byId[flashing].HasFlashingWarning);
+        Assert.True(byId[flashing].SafetyFlags["flashing"]);
         // The server names the hazard rather than leaving the client to re-derive it from the
         // two booleans — that re-derivation is exactly what moving the gate here removed.
         Assert.Equal("Flashing", byId[flashing].GateReason);
@@ -220,7 +227,7 @@ public class PostMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture<Fr
         // A JPEG cannot contain movement — image/gif is the only animated format accepted (§7.1).
         // Gating one for "intense motion" mis-filed a nuisance as a seizure hazard and left
         // ReduceMotion with nothing to do. The flag is still recorded, just not acted on.
-        Assert.True(media.HasIntenseMotionWarning);
+        Assert.True(media.SafetyFlags["intenseMotion"]);
         Assert.NotEmpty(media.Variants);
         Assert.Null(media.GateReason);
     }

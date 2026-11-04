@@ -10,6 +10,8 @@ using FriendCore.Domain.Users;
 using MediatR;
 
 using FriendCore.Application.Common;
+using FriendCore.Application.Common.Options;
+using Microsoft.Extensions.Options;
 
 namespace FriendCore.Application.Posts.Commands.CreatePost;
 
@@ -21,7 +23,8 @@ internal sealed class CreatePostCommandHandler(
     ITagRepository tagRepository,
     ITagNormalizer normalizer,
     MediaResponseFactory mediaResponseFactory,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IOptions<EmailOptions> emailOptions)
     : IRequestHandler<CreatePostCommand, ErrorOr<PostResponse>>
 {
     public async Task<ErrorOr<PostResponse>> Handle(CreatePostCommand request, CancellationToken cancellationToken)
@@ -35,8 +38,9 @@ internal sealed class CreatePostCommandHandler(
 
         // §13.7: email verification required before POSTING only — comments, likes, and follows
         // stay open to unverified accounts (deliberate comfort-first product decision; revisit
-        // during closed testing).
-        if (!author.IsVerified)
+        // during closed testing). When RequireVerificationForPosting is false the gate is
+        // skipped (useful when no email service is configured).
+        if (emailOptions.Value.RequireVerificationForPosting && !author.IsVerified)
             return UserErrors.EmailNotVerified;
 
         // Fail before tag resolution persists anything: resolving creates missing tags, and an

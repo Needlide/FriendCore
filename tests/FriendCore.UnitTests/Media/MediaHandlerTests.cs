@@ -38,7 +38,7 @@ public class MediaHandlerTests
         new(_currentUserService, _mediaRepository);
 
     private static UploadMediaCommand Command(Stream content, string contentType = "image/png") =>
-        new(content, content.Length, "photo.png", contentType, false, false);
+        new(content, content.Length, "photo.png", contentType, new Dictionary<string, bool>());
 
     [Fact]
     public async Task Upload_ReturnsUnauthorized_WhenNoCurrentUser()
@@ -83,7 +83,12 @@ public class MediaHandlerTests
 
         using var content = new MemoryStream(PngBytes);
         var result = await UploadHandler().Handle(
-            new UploadMediaCommand(content, content.Length, "photo.png", "IMAGE/PNG", true, false),
+            new UploadMediaCommand(
+                content,
+                content.Length,
+                "photo.png",
+                "IMAGE/PNG",
+                new Dictionary<string, bool> { ["flashing"] = true }),
             CancellationToken.None);
 
         Assert.False(result.IsError);
@@ -92,7 +97,7 @@ public class MediaHandlerTests
         Assert.Equal(0, uploadedStreamPosition); // rewound after the magic-byte read
         Assert.Equal(_userId, added.UploaderId);
         Assert.Equal("image/png", added.ContentType); // normalised
-        Assert.True(added.HasFlashingWarning);
+        Assert.True(added.SafetyFlags.IsSet("flashing"));
         Assert.Equal(MediaStatus.Processing, added.Status);
         Assert.Equal(added.Id.ToString(), result.Value.Id);
         Assert.Equal("Processing", result.Value.Status);
@@ -102,7 +107,7 @@ public class MediaHandlerTests
     [Fact]
     public async Task Status_ReturnsNotFound_ForAnotherUsersMedia()
     {
-        var media = MediaItem.Create(Ulid.NewUlid(), "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(Ulid.NewUlid(), "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
 
         var result = await StatusHandler().Handle(new GetMediaStatusQuery(media.Id), CancellationToken.None);
@@ -114,7 +119,7 @@ public class MediaHandlerTests
     [Fact]
     public async Task Status_ReturnsStatus_ForOwner()
     {
-        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
 
         var result = await StatusHandler().Handle(new GetMediaStatusQuery(media.Id), CancellationToken.None);
@@ -129,7 +134,7 @@ public class MediaHandlerTests
     [Fact]
     public async Task Delete_ReturnsNotFound_ForAnotherUsersMedia()
     {
-        var media = MediaItem.Create(Ulid.NewUlid(), "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(Ulid.NewUlid(), "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
 
         var result = await DeleteHandler().Handle(new DeleteMediaCommand(media.Id), CancellationToken.None);
@@ -142,7 +147,7 @@ public class MediaHandlerTests
     [Fact]
     public async Task Delete_ReturnsConflict_WhenAttachedToPost()
     {
-        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
         _mediaRepository.GetAttachedIdsAsync(Arg.Any<IReadOnlyCollection<Ulid>>(), Arg.Any<CancellationToken>())
             .Returns([media.Id]);
@@ -157,7 +162,7 @@ public class MediaHandlerTests
     [Fact]
     public async Task Delete_SoftDeletes_OwnUnattachedMedia()
     {
-        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", false, false, Now);
+        var media = MediaItem.Create(_userId, "x.png", "image/png", "png", MediaSafetyFlags.Empty, Now);
         _mediaRepository.GetByIdAsync(media.Id, Arg.Any<CancellationToken>()).Returns(media);
 
         var result = await DeleteHandler().Handle(new DeleteMediaCommand(media.Id), CancellationToken.None);
