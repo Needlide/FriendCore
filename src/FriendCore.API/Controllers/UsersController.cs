@@ -284,7 +284,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
 
     [HttpPost("{username}/report")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -295,7 +295,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(
             new ReportUserCommand(username, request.Category, request.Note), cancellationToken);
-        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : Accepted();
+        return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
     }
 
     [HttpGet("me/blocks")]

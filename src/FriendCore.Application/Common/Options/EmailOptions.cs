@@ -31,4 +31,12 @@ public sealed class EmailOptions
     ///     and you want the verification gate enforced.
     /// </summary>
     public bool RequireVerificationForPosting { get; init; } = true;
+
+    /// <summary>
+    ///     When true, a new registration is marked verified immediately and no verification
+    ///     email is sent. Intended for preview/demo deployments where no mail provider is
+    ///     configured, so there is no way for a new user to complete verification. Off by
+    ///     default; production must leave this false and configure Resend instead.
+    /// </summary>
+    public bool AutoVerifyNewUsers { get; init; }
 }

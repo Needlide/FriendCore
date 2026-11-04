@@ -22,6 +22,15 @@ internal sealed class UserRegisteredEventHandler(
         var options = emailOptions.Value;
         var now = dateTimeProvider.UtcNow;
 
+        // Auto-verified registrations have nothing to confirm; sending a token would only
+        // create dead rows and a link that is already useless.
+        if (options.AutoVerifyNewUsers)
+        {
+            logger.LogInformation(
+                "Skipping verification email for auto-verified user {UserId}", notification.UserId);
+            return;
+        }
+
         try
         {
             var rawToken = tokenHasher.GenerateToken();

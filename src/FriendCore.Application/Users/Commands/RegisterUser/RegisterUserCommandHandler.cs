@@ -15,6 +15,7 @@ internal sealed class RegisterUserCommandHandler(
     IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService,
     IOptions<SeedingOptions> seedingOptions,
+    IOptions<EmailOptions> emailOptions,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<RegisterUserCommand, ErrorOr<AuthTokens>>
 {
@@ -54,6 +55,11 @@ internal sealed class RegisterUserCommandHandler(
         if (seedingOptions.Value.AdminEmails.Any(seed =>
                 emailHashService.Hash(User.NormalizeEmail(seed)) == emailHash))
             user.AssignRole(UserRole.Admin);
+
+        // Preview/demo escape hatch: without a mail provider a new user can never complete
+        // verification, so treat the account as verified from the start. Off by default.
+        if (emailOptions.Value.AutoVerifyNewUsers)
+            user.MarkEmailVerified(now);
 
         var preferences = UserPreferences.CreateDefault(user.Id, now);
 

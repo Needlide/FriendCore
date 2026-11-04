@@ -17,6 +17,7 @@ public class RegisterUserCommandHandlerTests
     private readonly IRefreshTokenService _refreshTokenService = Substitute.For<IRefreshTokenService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private SeedingOptions _seeding = new();
+    private EmailOptions _email = new();
 
     public RegisterUserCommandHandlerTests()
     {
@@ -32,7 +33,7 @@ public class RegisterUserCommandHandlerTests
 
     private RegisterUserCommandHandler CreateHandler() =>
         new(_repository, _passwordHasher, _emailHashService, _jwtTokenService, _refreshTokenService,
-            Options.Create(_seeding), _dateTimeProvider);
+            Options.Create(_seeding), Options.Create(_email), _dateTimeProvider);
 
     [Fact]
     public async Task Handle_ReturnsConflict_WhenEmailAlreadyExists()
@@ -62,6 +63,23 @@ public class RegisterUserCommandHandlerTests
         Assert.False(result.IsError);
         Assert.Equal(UserRole.User, added!.Role);
         Assert.Equal("hash:alice@example.com", added.EmailHash);
+        Assert.False(added.IsVerified);
+    }
+
+    [Fact]
+    public async Task Handle_MarksUserVerified_WhenAutoVerifyEnabled()
+    {
+        _email = new EmailOptions { AutoVerifyNewUsers = true };
+        User? added = null;
+        await _repository.AddAsync(
+            Arg.Do<User>(u => added = u), Arg.Any<UserPreferences>(), Arg.Any<CancellationToken>());
+
+        var result = await CreateHandler().Handle(
+            new RegisterUserCommand("alice", "Alice", "alice@example.com", "password123"),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.True(added!.IsVerified);
     }
 
     [Fact]

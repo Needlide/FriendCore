@@ -1,4 +1,5 @@
 using ErrorOr;
+using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Common.Models;
 using FriendCore.Domain.Users;
 using MediatR;
@@ -7,7 +8,8 @@ namespace FriendCore.Application.Users.Queries.GetFollowing;
 
 internal sealed class GetFollowingQueryHandler(
     IUserRepository userRepository,
-    IFollowRepository followRepository)
+    IFollowRepository followRepository,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetFollowingQuery, ErrorOr<FollowListResponse>>
 {
     private const int MaxResults = 200;
@@ -20,7 +22,17 @@ internal sealed class GetFollowingQueryHandler(
             return UserErrors.NotFound;
 
         var following = await followRepository.GetFollowingAsync(user.Id, MaxResults, cancellationToken);
-        var users = following.Select(u => UserSummaryResponse.FromUser(u)).ToList();
+
+        // Same viewer-relative state as the followers list: the rows let the client restore
+        // the correct Follow/Following button without an N+1 of per-row lookups.
+        var followedByViewer = currentUserService.UserId is { } viewerId
+            ? (await followRepository.GetFollowedIdsAsync(viewerId, cancellationToken)).ToHashSet()
+            : new HashSet<Ulid>();
+
+        var users = following
+            .Select(u => UserSummaryResponse.FromUser(u, followedByViewer.Contains(u.Id)))
+            .ToList();
+
         return new FollowListResponse(users);
     }
 }
