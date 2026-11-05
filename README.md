@@ -179,14 +179,13 @@ cookie problems.
 ## Scope and intentional gaps
 
 Built and tested: everything in the feature map above. Deferred by design:
-blogging, custom profile CSS and pages,
-end-to-end encrypted DMs, creator monetisation, theme marketplace, global user
-search, and the separate mobile app. Post and comment editing are also not
-implemented; deletion is a soft delete, and media objects are retained after
-soft deletion.
+blogging, custom profile CSS and pages, end-to-end encrypted DMs, creator
+monetisation, theme marketplace, global user search, and the separate mobile app.
+Post and comment editing are also not implemented; deletion is a soft delete, and
+media objects are retained after soft deletion.
 
-These are product decisions rather than unfinished work, and the README of the
-web client links to the same scope note.
+These are scope decisions for this milestone rather than accidental omissions.
+The web client's README links to the same feature map and scope note.
 
 ## Repository layout
 
