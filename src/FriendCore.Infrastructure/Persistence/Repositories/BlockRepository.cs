@@ -45,6 +45,16 @@ public sealed class BlockRepository(AppDbContext context) : IBlockRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Ulid>> GetBlockedIdsAsync(
+        Ulid blockerId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Blocks
+            .Where(block => block.BlockerId == blockerId)
+            .Select(block => block.BlockedId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> RemoveAsync(Ulid blockerId, Ulid blockedId, CancellationToken cancellationToken = default)
     {
         var block = await context.Blocks.FirstOrDefaultAsync(

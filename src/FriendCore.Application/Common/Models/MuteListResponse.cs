@@ -1,3 +1,3 @@
 namespace FriendCore.Application.Common.Models;
 
-public sealed record MuteListResponse(List<Ulid> MutedUserIds);
+public sealed record MuteListResponse(IReadOnlyList<UserSummaryResponse> Users);

@@ -16,4 +16,9 @@ public interface IBlockRepository
 
     // Ids of every user with a block relationship (either direction) with userId.
     Task<IReadOnlyList<Ulid>> GetCounterpartIdsAsync(Ulid userId, CancellationToken cancellationToken = default);
+
+    // Ids of users this user has personally blocked. Directional on purpose: the management
+    // list must never reveal a block created by someone else (§8.2), and only the blocker can
+    // undo their own row.
+    Task<IReadOnlyList<Ulid>> GetBlockedIdsAsync(Ulid blockerId, CancellationToken cancellationToken = default);
 }
