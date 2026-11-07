@@ -73,8 +73,8 @@ public class BlockMuteListFlowTests(FriendCoreApiFactory factory) : IClassFixtur
     [Fact]
     public async Task BlockList_DoesNotRevealABlockCreatedBySomeoneElse()
     {
-        var (aClient, _) = await RegisterClient();
-        var (bClient, aUsername) = await RegisterClient();
+        var (aClient, aUsername) = await RegisterClient();
+        var (bClient, _) = await RegisterClient();
 
         // B blocks A. A must not learn this from the management list, matching the
         // 404-not-403 rule that keeps the blocked person unaware (§8.2).
@@ -93,7 +93,8 @@ public class BlockMuteListFlowTests(FriendCoreApiFactory factory) : IClassFixtur
     public async Task Lists_StartEmpty_AndOnlyContainTheCurrentUsersEntries()
     {
         var (aClient, _) = await RegisterClient();
-        var (bClient, cUsername) = await RegisterClient();
+        var (bClient, _) = await RegisterClient();
+        var (_, cUsername) = await RegisterClient();
 
         var aBlocks = await aClient.GetFromJsonAsync<BlockListResponse>("/api/v1/users/me/blocks");
         var aMutes = await aClient.GetFromJsonAsync<MuteListResponse>("/api/v1/users/me/mutes");

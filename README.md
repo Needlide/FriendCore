@@ -97,7 +97,7 @@ dotnet test tests/FriendCore.IntegrationTests   # requires Docker
 | Suite | Count | Notes |
 |---|---:|---|
 | Unit | 522 | Handlers, validators, domain rules, services |
-| Integration | 368 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client. Last full run: 363; the 5 new block/mute list tests await a Docker-enabled run |
+| Integration | 368 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client |
 | Architecture | 8 | Enforces layer boundaries and naming rules |
 
 CI (`.github/workflows/ci.yml`) runs architecture + unit tests on every push and
