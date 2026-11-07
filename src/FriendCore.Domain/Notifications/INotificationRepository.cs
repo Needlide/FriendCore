@@ -22,4 +22,14 @@ public interface INotificationRepository
 
     // Marks every unread notification for the recipient as read; returns how many changed.
     Task<int> MarkAllReadAsync(Ulid recipientId, CancellationToken cancellationToken = default);
+
+    // Recipient-scoped single load: a notification owned by someone else is not found.
+    Task<Notification?> GetByIdAsync(
+        Ulid id,
+        Ulid recipientId,
+        CancellationToken cancellationToken = default);
+
+    Task MarkReadAsync(Notification notification, CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(Notification notification, CancellationToken cancellationToken = default);
 }

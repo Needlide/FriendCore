@@ -11,6 +11,9 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
     private async Task<HttpClient> AuthedClient() =>
         (await new AuthScenarios(factory).RegisterVerifiedClientAsync()).Client;
 
+    private Task<(HttpClient Client, string Username)> RegisterClient() =>
+        new AuthScenarios(factory).RegisterVerifiedClientAsync();
+
     private static async Task<string> CreatePost(HttpClient client, string content = "a post")
     {
         var response = await client.PostAsJsonAsync("/api/v1/posts", new { content, sensitivity = "General" });
@@ -86,6 +89,71 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
 
         var post = await client.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
         Assert.Equal(0, post!.LikeCount);
+    }
+
+    [Fact]
+    public async Task LikesList_ShowsLikers_NewestFirst_AndClearsAfterUnlike()
+    {
+        var (author, _) = await RegisterClient();
+        var (alice, aliceName) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var postId = await CreatePost(author);
+        await alice.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+        await bob.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+
+        var likes = await author.GetFromJsonAsync<LikeListResponse>($"/api/v1/posts/{postId}/likes");
+        Assert.Equal(2, likes!.Users.Count);
+        Assert.Contains(likes.Users, user => user.Username == aliceName);
+        Assert.Contains(likes.Users, user => user.Username == bobName);
+
+        // The list is anonymous-readable, like the post it belongs to.
+        var anonymous = factory.CreateClient();
+        var publicLikes = await anonymous.GetFromJsonAsync<LikeListResponse>(
+            $"/api/v1/posts/{postId}/likes");
+        Assert.Equal(2, publicLikes!.Users.Count);
+
+        await alice.DeleteAsync($"/api/v1/posts/{postId}/like");
+        var after = await author.GetFromJsonAsync<LikeListResponse>($"/api/v1/posts/{postId}/likes");
+        var remaining = Assert.Single(after!.Users);
+        Assert.Equal(bobName, remaining.Username);
+    }
+
+    [Fact]
+    public async Task LikesList_OmitsLikersHiddenByABlock()
+    {
+        var (author, authorName) = await RegisterClient();
+        var (liker, likerName) = await RegisterClient();
+        var postId = await CreatePost(author);
+
+        await liker.PostAsync($"/api/v1/posts/{postId}/like", content: null);
+        Assert.Single((await author.GetFromJsonAsync<LikeListResponse>(
+            $"/api/v1/posts/{postId}/likes"))!.Users);
+
+        // A block hides the liker from the author's user lookups. The denormalised count may
+        // still include them (accepted MVP trade-off), but the list must not expose them.
+        await liker.PostAsync($"/api/v1/users/{authorName}/block", content: null);
+
+        var likes = await author.GetFromJsonAsync<LikeListResponse>($"/api/v1/posts/{postId}/likes");
+        Assert.Empty(likes!.Users);
+        var post = await author.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
+        Assert.Equal(1, post!.LikeCount);
+        Assert.DoesNotContain(likerName, likes.Users.Select(user => user.Username));
+    }
+
+    [Fact]
+    public async Task LikesList_ReturnsNotFound_ForMissingOrBlockedPost()
+    {
+        var (author, authorName) = await RegisterClient();
+        var (viewer, _) = await RegisterClient();
+        var postId = await CreatePost(author);
+
+        var missing = await viewer.GetAsync($"/api/v1/posts/{Ulid.NewUlid()}/likes");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+
+        // Blocking the author hides the post everywhere, including its likers list.
+        await viewer.PostAsync($"/api/v1/users/{authorName}/block", content: null);
+        var hidden = await viewer.GetAsync($"/api/v1/posts/{postId}/likes");
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
     }
 
     [Fact]

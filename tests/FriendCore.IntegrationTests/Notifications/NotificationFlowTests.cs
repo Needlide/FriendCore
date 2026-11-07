@@ -168,6 +168,79 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task SingleNotification_CanBeMarkedRead_WithoutMarkingTheRest()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var (cara, _) = await RegisterClient();
+
+        await alice.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        await cara.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        var notifications = (await GetNotifications(bob)).Notifications;
+        Assert.Equal(2, notifications.Count);
+        Assert.Equal(2, await GetUnreadCount(bob));
+
+        var read = await bob.PostAsync($"/api/v1/notifications/{notifications[0].Id}/read", content: null);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var count = await read.Content.ReadFromJsonAsync<UnreadCountResponse>();
+        Assert.Equal(1, count!.Count);
+
+        // Only the targeted row changed; the badge follows the server's authoritative count.
+        var after = (await GetNotifications(bob)).Notifications;
+        Assert.True(after.Single(n => n.Id == notifications[0].Id).IsRead);
+        Assert.False(after.Single(n => n.Id == notifications[1].Id).IsRead);
+        Assert.Equal(1, await GetUnreadCount(bob));
+
+        // Idempotent: reading it again is still a 200 with an unchanged count.
+        var again = await bob.PostAsync($"/api/v1/notifications/{notifications[0].Id}/read", content: null);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        var againCount = await again.Content.ReadFromJsonAsync<UnreadCountResponse>();
+        Assert.Equal(1, againCount!.Count);
+    }
+
+    [Fact]
+    public async Task SingleNotification_CanBeDeleted_AndUnreadCountDrops()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        await alice.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        var notification = Assert.Single((await GetNotifications(bob)).Notifications);
+        Assert.Equal(1, await GetUnreadCount(bob));
+
+        var delete = await bob.DeleteAsync($"/api/v1/notifications/{notification.Id}");
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        var count = await delete.Content.ReadFromJsonAsync<UnreadCountResponse>();
+        Assert.Equal(0, count!.Count);
+
+        Assert.Empty((await GetNotifications(bob)).Notifications);
+        Assert.Equal(0, await GetUnreadCount(bob));
+
+        // Deleting the same row again is a 404, not a second success.
+        var again = await bob.DeleteAsync($"/api/v1/notifications/{notification.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task SingleNotification_Actions_AreScopedToTheRecipient()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        await alice.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+        var notification = Assert.Single((await GetNotifications(bob)).Notifications);
+
+        // Alice cannot read or delete Bob's notification; both look like missing rows.
+        var read = await alice.PostAsync($"/api/v1/notifications/{notification.Id}/read", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        var delete = await alice.DeleteAsync($"/api/v1/notifications/{notification.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
+
+        // Bob's row is untouched.
+        var stillUnread = Assert.Single((await GetNotifications(bob)).Notifications);
+        Assert.False(stillUnread.IsRead);
+        Assert.Equal(1, await GetUnreadCount(bob));
+    }
+
+    [Fact]
     public async Task Snooze_SuppressesEverything_ThenResumes()
     {
         var (alice, aliceName) = await RegisterClient();

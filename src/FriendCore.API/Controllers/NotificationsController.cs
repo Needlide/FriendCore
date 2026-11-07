@@ -1,4 +1,7 @@
 using FriendCore.API.Extensions;
+using FriendCore.Application.Common.Models;
+using FriendCore.Application.Notifications.Commands.DeleteNotification;
+using FriendCore.Application.Notifications.Commands.MarkNotificationRead;
 using FriendCore.Application.Notifications.Commands.MarkNotificationsRead;
 using FriendCore.Application.Notifications.Queries.GetNotifications;
 using FriendCore.Application.Notifications.Queries.GetUnreadCount;
@@ -42,5 +45,33 @@ public sealed class NotificationsController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new MarkNotificationsReadCommand(), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPost("{id}/read")]
+    [Authorize]
+    [ProducesResponseType(typeof(UnreadCountResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkRead(string id, CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var notificationId))
+            return NotFound();
+
+        var result = await sender.Send(new MarkNotificationReadCommand(notificationId), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize]
+    [ProducesResponseType(typeof(UnreadCountResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var notificationId))
+            return NotFound();
+
+        var result = await sender.Send(new DeleteNotificationCommand(notificationId), cancellationToken);
+        return result.ToActionResult();
     }
 }

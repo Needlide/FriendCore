@@ -150,6 +150,20 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Ulid>> GetLikerIdsAsync(
+        Ulid postId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Likes
+            .Where(like => like.PostId == postId)
+            .OrderByDescending(like => like.CreatedAt)
+            .ThenByDescending(like => like.UserId)
+            .Take(limit)
+            .Select(like => like.UserId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddLikeAsync(Like like, CancellationToken cancellationToken = default)
     {
         await context.Likes.AddAsync(like, cancellationToken);

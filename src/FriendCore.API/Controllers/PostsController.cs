@@ -11,6 +11,7 @@ using FriendCore.Application.Posts.Commands.LikePost;
 using FriendCore.Application.Posts.Commands.UnlikePost;
 using FriendCore.Application.Posts.Queries.GetPost;
 using FriendCore.Application.Posts.Queries.GetPostComments;
+using FriendCore.Application.Posts.Queries.GetPostLikes;
 using FriendCore.Application.Posts.Queries.GetUserPosts;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -122,6 +123,19 @@ public sealed class PostsController(ISender sender) : ControllerBase
             return NotFound();
 
         var result = await sender.Send(new UnlikePostCommand(postId), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpGet("{id}/likes")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLikes(string id, CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var postId))
+            return NotFound();
+
+        var result = await sender.Send(new GetPostLikesQuery(postId), cancellationToken);
         return result.ToActionResult();
     }
 

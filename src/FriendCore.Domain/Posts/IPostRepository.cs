@@ -53,6 +53,13 @@ public interface IPostRepository
 
     Task<bool> LikeExistsAsync(Ulid postId, Ulid userId, CancellationToken cancellationToken = default);
 
+    // Ids of users who liked the post, newest like first. Likes are not block-filtered, so the
+    // caller still resolves users through IUserRepository to apply block invisibility.
+    Task<IReadOnlyList<Ulid>> GetLikerIdsAsync(
+        Ulid postId,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     // Adds the like and persists; any tracked post count change is saved in the same unit of work.
     Task AddLikeAsync(Like like, CancellationToken cancellationToken = default);
 

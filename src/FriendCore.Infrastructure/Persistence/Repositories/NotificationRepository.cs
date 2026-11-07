@@ -55,4 +55,26 @@ public sealed class NotificationRepository(AppDbContext context) : INotification
                 setters => setters.SetProperty(notification => notification.IsRead, true),
                 cancellationToken);
     }
+
+    public Task<Notification?> GetByIdAsync(
+        Ulid id,
+        Ulid recipientId,
+        CancellationToken cancellationToken = default)
+    {
+        return context.Notifications.FirstOrDefaultAsync(
+            notification => notification.Id == id && notification.RecipientId == recipientId,
+            cancellationToken);
+    }
+
+    public async Task MarkReadAsync(Notification notification, CancellationToken cancellationToken = default)
+    {
+        context.Notifications.Update(notification);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(Notification notification, CancellationToken cancellationToken = default)
+    {
+        context.Notifications.Remove(notification);
+        await context.SaveChangesAsync(cancellationToken);
+    }
 }
