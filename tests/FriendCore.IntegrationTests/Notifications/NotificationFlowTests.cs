@@ -273,6 +273,34 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task Snooze_StopsSuppressing_WhenItsWindowExpires()
+    {
+        var (bob, bobName) = await RegisterClient();
+        // Register the future actor BEFORE moving the clock: her bearer token must be issued at
+        // real time, or its `nbf` would sit in the future once the clock snaps back.
+        var (cara, caraName) = await RegisterClient();
+
+        var until = factory.Clock.UtcNow.AddHours(1);
+        var snooze = await bob.PostAsJsonAsync("/api/v1/users/me/snooze", new { until });
+        Assert.Equal(HttpStatusCode.OK, snooze.StatusCode);
+
+        try
+        {
+            // Past the snooze instant — no explicit lift, no second client action.
+            factory.Clock.Set(until.AddMinutes(1));
+            await cara.PostAsync($"/api/v1/users/{bobName}/follow", content: null);
+
+            var notification = Assert.Single((await GetNotifications(bob)).Notifications);
+            Assert.Equal(caraName, notification.Actor.Username);
+            Assert.Equal(1, await GetUnreadCount(bob));
+        }
+        finally
+        {
+            factory.Clock.Reset();
+        }
+    }
+
+    [Fact]
     public async Task UnreadCount_TracksAndClearsOnRead()
     {
         var (author, _) = await RegisterClient();

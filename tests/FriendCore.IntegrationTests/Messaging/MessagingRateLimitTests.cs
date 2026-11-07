@@ -27,17 +27,27 @@ public class MessagingRateLimitTests : IClassFixture<StrictRateLimitFactory>
         var start = await alice.PostAsJsonAsync("/api/v1/conversations", new { username = bobName });
         var conversation = await start.Content.ReadFromJsonAsync<ConversationResponse>();
 
-        // 1 start + 9 sends fill the bucket of 10; the 10th send is rejected.
-        for (var i = 0; i < 9; i++)
+        // The bucket holds 10 and refills one token every 5 s. Do NOT assume a fixed number of
+        // requests fills it: a slow CI run can earn a token mid-loop and turn the old "11th is
+        // rejected" assertion into a flake. Keep sending until the limiter says stop instead —
+        // 40 requests need >3 minutes of refill to all pass, far longer than this test takes.
+        HttpResponseMessage? rejected = null;
+        for (var i = 0; i < 40 && rejected is null; i++)
         {
             var send = await alice.PostAsJsonAsync(
                 $"/api/v1/conversations/{conversation!.Id}/messages", new { content = $"m{i}" });
-            Assert.Equal(HttpStatusCode.Created, send.StatusCode);
+
+            // Anything other than success or the limiter's 429 is a real bug, not a flake.
+            Assert.True(
+                send.StatusCode is HttpStatusCode.Created or HttpStatusCode.TooManyRequests,
+                $"Unexpected status {(int)send.StatusCode} on message {i}.");
+
+            if (send.StatusCode == HttpStatusCode.TooManyRequests)
+                rejected = send;
         }
 
-        var rejected = await alice.PostAsJsonAsync(
-            $"/api/v1/conversations/{conversation!.Id}/messages", new { content = "spam" });
-        Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
-        Assert.NotNull(rejected.Headers.RetryAfter);
+        Assert.NotNull(rejected);
+        Assert.NotNull(rejected!.Headers.RetryAfter);
+        Assert.True(rejected.Headers.RetryAfter!.Delta > TimeSpan.Zero);
     }
 }

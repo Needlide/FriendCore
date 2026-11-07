@@ -31,7 +31,7 @@ two SignalR hubs for push updates, and optionally serves the built Angular SPA.
 | **Realtime** | SignalR — notifications and messaging hubs |
 | **Media** | S3-compatible storage, ImageSharp WebP variants, background processing |
 | **Moderation** | Reports, enforcement ladder, appeals, audit log, admin metrics |
-| **Tests** | 522 unit · 374 integration · 8 architecture (904 total) |
+| **Tests** | 522 unit · 375 integration · 8 architecture (905 total) |
 | **Deployment** | Heroku preview today; Docker/Caddy/systemd files included for self-hosting |
 
 ## Feature map
@@ -97,7 +97,7 @@ dotnet test tests/FriendCore.IntegrationTests   # requires Docker
 | Suite | Count | Notes |
 |---|---:|---|
 | Unit | 522 | Handlers, validators, domain rules, services |
-| Integration | 374 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client |
+| Integration | 375 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client |
 | Architecture | 8 | Enforces layer boundaries and naming rules |
 
 CI (`.github/workflows/ci.yml`) runs architecture + unit tests on every push and
@@ -175,6 +175,26 @@ The repository also includes a `Caddyfile`, a systemd unit, and an environment
 template for a conventional Linux host; the API can serve the built SPA from
 `Spa:Path`, which keeps client and API on one origin and avoids cross-site
 cookie problems.
+
+### Operational recovery notes
+
+- **Keep more than one admin on a long-lived instance.** Moderation is
+  role-gated and there is no UI that grants roles, so losing the only `Admin`
+  account leaves no in-app recovery path. Promote a replacement with SQL before
+  that happens (or right after, if you still have database access):
+
+  ```sql
+  UPDATE users SET role = 'Admin' WHERE username = 'someone';
+  ```
+
+  Prefer a second admin account from the start on anything that will outlive a
+  demo.
+- **Migrations do not run automatically outside Development.** A deploy that
+  adds a migration needs an explicit one-off
+  `dotnet ef database update --startup-project src/FriendCore.API` (the preview
+  uses `--migrate`) before code depends on the new column. The closed beta hit
+  the stale-schema version of this twice; treat the migration step as part of
+  the deploy checklist, not as something startup will fix.
 
 ## Scope and intentional gaps
 
