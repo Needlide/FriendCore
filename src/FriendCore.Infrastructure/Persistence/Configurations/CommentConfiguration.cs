@@ -32,6 +32,7 @@ public sealed class CommentConfiguration : IEntityTypeConfiguration<Comment>
             .IsRequired();
 
         builder.Property(comment => comment.CreatedAt).HasColumnName("created_at");
+        builder.Property(comment => comment.EditedAt).HasColumnName("edited_at");
         builder.Property(comment => comment.DeletedAt).HasColumnName("deleted_at");
 
         // Id trails the sort columns so the keyset (ORDER BY created_at DESC, id DESC) is fully

@@ -231,6 +231,12 @@ public sealed class PostRepository(AppDbContext context) : IPostRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateCommentAsync(Comment comment, CancellationToken cancellationToken = default)
+    {
+        context.Comments.Update(comment);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Comment>> GetCommentsByPostAsync(
         Ulid postId,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,

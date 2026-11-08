@@ -10,7 +10,8 @@ public sealed record CommentResponse(
     string AuthorUsername,
     string AuthorDisplayName,
     string Content,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? EditedAt)
 {
     public static CommentResponse Create(Comment comment, User author) =>
         new(
@@ -20,7 +21,8 @@ public sealed record CommentResponse(
             author.Username,
             author.DisplayName,
             comment.Content,
-            comment.CreatedAt);
+            comment.CreatedAt,
+            comment.EditedAt);
 }
 
 public sealed record CommentFeedResponse(IReadOnlyList<CommentResponse> Comments, string? NextCursor);

@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FriendCore.Application.Common.Models;
+using FriendCore.Domain.Users;
 using FriendCore.IntegrationTests.Infrastructure;
 
 namespace FriendCore.IntegrationTests.Notifications;
@@ -11,8 +13,20 @@ namespace FriendCore.IntegrationTests.Notifications;
 /// </summary>
 public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture<FriendCoreApiFactory>
 {
+    private readonly AuthScenarios _scenarios = new(factory);
+
     private Task<(HttpClient Client, string Username)> RegisterClient() =>
         new AuthScenarios(factory).RegisterVerifiedClientAsync();
+
+    private async Task<HttpClient> ModeratorClient()
+    {
+        factory.Clock.Reset();
+        var client = factory.CreateClient();
+        var token = await _scenarios.RegisterWithRoleAndGetToken(
+            client, AuthScenarios.UniqueEmail(), UserRole.Moderator);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
 
     private static async Task<string> CreatePost(HttpClient client, string content)
     {
@@ -342,5 +356,47 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
         var response = await factory.CreateClient().GetAsync("/api/v1/notifications");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolvedReport_NotifiesOnlyTheReporter_WithReportAsEntity()
+    {
+        var (author, _) = await RegisterClient();
+        var (reporter, _) = await RegisterClient();
+        var postId = await CreatePost(author, "reported post");
+
+        await reporter.PostAsJsonAsync($"/api/v1/posts/{postId}/report", new { category = "Spam" });
+
+        var moderator = await ModeratorClient();
+        var queue = await moderator.GetFromJsonAsync<ReportQueueResponse>("/api/v1/admin/reports");
+        var report = Assert.Single(queue!.Reports, r => r.TargetId == postId);
+
+        var resolved = await moderator.PostAsJsonAsync(
+            $"/api/v1/admin/reports/{report.Id}/resolve",
+            new { action = "ReportDismissed", reason = "no violation" });
+        Assert.Equal(HttpStatusCode.NoContent, resolved.StatusCode);
+
+        var notification = Assert.Single((await GetNotifications(reporter)).Notifications);
+        Assert.Equal("ReportResolved", notification.Type);
+        Assert.Equal(report.Id, notification.EntityId);
+
+        // The reported author is never told who reported them, nor that a report existed.
+        Assert.Empty((await GetNotifications(author)).Notifications);
+    }
+
+    [Fact]
+    public async Task DirectModerationAction_NotifiesTheAffectedUser()
+    {
+        var moderator = await ModeratorClient();
+        var (user, username) = await RegisterClient();
+
+        var warn = await moderator.PostAsJsonAsync(
+            $"/api/v1/admin/users/{username}/action",
+            new { action = "Warning", reason = "be kinder" });
+        Assert.Equal(HttpStatusCode.NoContent, warn.StatusCode);
+
+        var notification = Assert.Single((await GetNotifications(user)).Notifications);
+        Assert.Equal("ModerationAction", notification.Type);
+        Assert.NotEmpty(notification.EntityId);
     }
 }

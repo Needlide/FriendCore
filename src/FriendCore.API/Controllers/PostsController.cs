@@ -9,6 +9,8 @@ using FriendCore.Application.Posts.Commands.DeleteComment;
 using FriendCore.Application.Posts.Commands.DeletePost;
 using FriendCore.Application.Posts.Commands.LikePost;
 using FriendCore.Application.Posts.Commands.UnlikePost;
+using FriendCore.Application.Posts.Commands.UpdateComment;
+using FriendCore.Application.Posts.Commands.UpdatePost;
 using FriendCore.Application.Posts.Queries.GetPost;
 using FriendCore.Application.Posts.Queries.GetPostComments;
 using FriendCore.Application.Posts.Queries.GetPostLikes;
@@ -68,6 +70,26 @@ public sealed class PostsController(ISender sender) : ControllerBase
         var result = await sender.Send(
             new ReportPostCommand(postId, request.Category, request.Note), cancellationToken);
         return result.IsError ? ErrorOrExtensions.FromErrors(result.Errors) : NoContent();
+    }
+
+    [HttpPatch("{id}")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(
+        string id,
+        [FromBody] UpdatePostRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(id, out var postId))
+            return NotFound();
+
+        var result = await sender.Send(
+            new UpdatePostCommand(postId, request.Content, request.Sensitivity), cancellationToken);
+        return result.ToActionResult();
     }
 
     [HttpDelete("{id}")]
@@ -170,6 +192,25 @@ public sealed class PostsController(ISender sender) : ControllerBase
             return NotFound();
 
         var result = await sender.Send(new GetPostCommentsQuery(postId, cursor), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpPatch("/api/v1/comments/{commentId}")]
+    [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateComment(
+        string commentId,
+        [FromBody] UpdateCommentRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Ulid.TryParse(commentId, out var id))
+            return NotFound();
+
+        var result = await sender.Send(new UpdateCommentCommand(id, request.Content), cancellationToken);
         return result.ToActionResult();
     }
 

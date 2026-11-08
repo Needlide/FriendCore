@@ -1,8 +1,10 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Notifications.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Moderation;
+using FriendCore.Domain.Notifications;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
 using MediatR;
@@ -15,6 +17,7 @@ internal sealed class ReviewAppealCommandHandler(
     IAdminAuditLogRepository auditLogRepository,
     IUserRepository userRepository,
     IPostRepository postRepository,
+    INotificationService notificationService,
     IDateTimeProvider dateTimeProvider)
     : IRequestHandler<ReviewAppealCommand, ErrorOr<Success>>
 {
@@ -48,6 +51,16 @@ internal sealed class ReviewAppealCommandHandler(
             await ReverseEnforcementAsync(action, now, cancellationToken);
 
         await appealRepository.SaveChangesAsync(cancellationToken);
+
+        // The appellant hears the outcome on every verdict (upheld, partly upheld, overturned).
+        await notificationService.CreateAsync(
+            appeal.AppellantId,
+            moderatorId,
+            NotificationType.AppealResolved,
+            appeal.Id,
+            now,
+            cancellationToken);
+
         return Result.Success;
     }
 

@@ -2,6 +2,7 @@ using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Commands.ReviewAppeal;
 using FriendCore.Application.Moderation.Commands.SubmitAppeal;
 using FriendCore.Application.Moderation.Common;
+using FriendCore.Application.Notifications.Services;
 using FriendCore.Domain.Moderation;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
@@ -71,6 +72,7 @@ public class AppealTests
     private readonly IAdminAuditLogRepository _auditLogRepository = Substitute.For<IAdminAuditLogRepository>();
     private readonly IUserRepository _userRepository = Substitute.For<IUserRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
+    private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
 
     private SubmitAppealCommandHandler SubmitHandler() =>
@@ -78,7 +80,7 @@ public class AppealTests
 
     private ReviewAppealCommandHandler ReviewHandler() =>
         new(_currentUserService, _appealRepository, _auditLogRepository, _userRepository, _postRepository,
-            _dateTimeProvider);
+            _notificationService, _dateTimeProvider);
 
     private static AdminAuditLog UserAction(Ulid moderatorId, Ulid targetUserId, ModerationActionType action) =>
         AdminAuditLog.Create(moderatorId, action, ReportTargetType.User, targetUserId, "reason", null, null, Now);

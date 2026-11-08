@@ -20,10 +20,12 @@ internal sealed class DeleteCommentCommandHandler(
         if (comment is null)
             return PostErrors.CommentNotFound;
 
-        if (comment.AuthorId != userId)
+        // §5.3 MVP: the post author moderates their own thread, so either the comment author
+        // or the author of the post the comment belongs to may delete it.
+        var post = await postRepository.GetByIdAsync(comment.PostId, cancellationToken);
+        if (comment.AuthorId != userId && post?.AuthorId != userId)
             return PostErrors.CommentNotAuthor;
 
-        var post = await postRepository.GetByIdAsync(comment.PostId, cancellationToken);
         post?.DecrementCommentCount();
 
         await postRepository.SoftDeleteCommentAsync(comment, cancellationToken);

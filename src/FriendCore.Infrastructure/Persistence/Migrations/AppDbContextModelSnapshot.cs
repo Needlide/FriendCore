@@ -543,6 +543,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
+                    b.Property<DateTimeOffset?>("EditedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("edited_at");
+
                     b.Property<string>("PostId")
                         .IsRequired()
                         .HasColumnType("text")

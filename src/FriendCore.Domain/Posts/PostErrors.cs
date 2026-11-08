@@ -45,5 +45,5 @@ public static class PostErrors
         Error.Validation("Post.CommentTooLong", "Comment must not exceed 500 characters.");
 
     public static Error CommentNotAuthor =>
-        Error.Forbidden("Post.CommentNotAuthor", "You can only delete your own comments.");
+        Error.Forbidden("Post.CommentNotAuthor", "You can only modify your own comments.");
 }

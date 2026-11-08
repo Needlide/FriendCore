@@ -15,6 +15,7 @@ public sealed record PostResponse(
     int CommentCount,
     bool IsLikedByCurrentUser,
     DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
     IReadOnlyList<MediaResponse> Media,
     IReadOnlyList<PostTagResponse> Tags)
 {
@@ -35,6 +36,7 @@ public sealed record PostResponse(
             post.CommentCount,
             isLikedByCurrentUser,
             post.CreatedAt,
+            post.UpdatedAt,
             media,
             tags);
 }

@@ -9,6 +9,10 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Ulid id, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameSlugAsync(string usernameSlug, CancellationToken cancellationToken = default);
 
+    // Global user search. Block and soft-delete filters apply automatically; banned users are
+    // excluded by the query itself.
+    Task<IReadOnlyList<User>> SearchAsync(string query, int limit, CancellationToken cancellationToken = default);
+
     // Resolves the user even when a block relationship hides them from normal queries. Only for
     // block management itself (block/unblock must reach the counterpart across the block).
     Task<User?> GetByUsernameSlugIgnoringBlocksAsync(string usernameSlug, CancellationToken cancellationToken = default);

@@ -7,6 +7,7 @@ using FriendCore.Application.Tags.Commands.UpdateProfileTags;
 using FriendCore.Application.Tags.Queries.GetMyProfileTags;
 using FriendCore.Application.Users.Commands.BlockUser;
 using FriendCore.Application.Users.Commands.ClearNotificationSnooze;
+using FriendCore.Application.Users.Commands.DeleteAccount;
 using FriendCore.Application.Users.Commands.FollowUser;
 using FriendCore.Application.Users.Commands.MuteUser;
 using FriendCore.Application.Users.Commands.SetNotificationSnooze;
@@ -27,6 +28,7 @@ using FriendCore.Application.Users.Queries.GetNotificationTypes;
 using FriendCore.Application.Users.Queries.GetPreferences;
 using FriendCore.Application.Users.Queries.GetUserProfile;
 using FriendCore.Application.Users.Queries.GetUserTags;
+using FriendCore.Application.Users.Queries.SearchUsers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -40,6 +42,48 @@ namespace FriendCore.API.Controllers;
 [EnableRateLimiting(RateLimitingExtensions.ApiPolicy)]
 public sealed class UsersController(ISender sender) : ControllerBase
 {
+    // Must match AuthController: the refresh cookie is scoped to the auth routes, so deletion
+    // has to name the same path or the browser keeps the old cookie.
+    private const string RefreshCookieName = "fc_refresh";
+    private const string RefreshCookiePath = "/api/v1/auth";
+
+    [HttpGet("search")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? q,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new SearchUsersQuery(q ?? string.Empty), cancellationToken);
+        return result.ToActionResult();
+    }
+
+    [HttpDelete("me")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAccount(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new DeleteAccountCommand(), cancellationToken);
+        if (result.IsError)
+            return ErrorOrExtensions.FromErrors(result.Errors);
+
+        ClearRefreshCookie();
+        return NoContent();
+    }
+
+    private void ClearRefreshCookie()
+    {
+        Response.Cookies.Delete(RefreshCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            Path = RefreshCookiePath
+        });
+    }
+
     [HttpGet("{username}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]

@@ -81,6 +81,30 @@ public class AppealFlowTests(FriendCoreApiFactory factory) : IClassFixture<Frien
     }
 
     [Fact]
+    public async Task AppealReview_NotifiesTheAppellant()
+    {
+        var (offender, offenderName, _) = await RegisterUser();
+        var moderatorA = await ModeratorClient();
+        await Ban(moderatorA, offenderName, "spam ring");
+        var actionId = await MyFirstActionId(offender);
+        await offender.PostAsJsonAsync(
+            "/api/v1/appeals", new { auditLogId = actionId, reason = "please review" });
+
+        var moderatorB = await ModeratorClient();
+        var queue = await moderatorB.GetFromJsonAsync<AppealQueueResponse>("/api/v1/admin/appeals");
+        var appeal = queue!.Appeals.Single(a => a.Appellant.Username == offenderName);
+
+        var review = await moderatorB.PostAsJsonAsync(
+            $"/api/v1/admin/appeals/{appeal.Id}/review", new { outcome = "Upheld", note = "stands" });
+        Assert.Equal(HttpStatusCode.NoContent, review.StatusCode);
+
+        var notifications = await offender.GetFromJsonAsync<NotificationListResponse>("/api/v1/notifications");
+        var outcome = Assert.Single(
+            notifications!.Notifications, notification => notification.Type == "AppealResolved");
+        Assert.Equal(appeal.Id, outcome.EntityId);
+    }
+
+    [Fact]
     public async Task OriginalModerator_CannotReviewTheAppeal()
     {
         var (offender, offenderName, _) = await RegisterUser();

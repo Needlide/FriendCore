@@ -83,6 +83,8 @@ public interface IPostRepository
 
     Task SoftDeleteCommentAsync(Comment comment, CancellationToken cancellationToken = default);
 
+    Task UpdateCommentAsync(Comment comment, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Comment>> GetCommentsByPostAsync(
         Ulid postId,
         (DateTimeOffset CreatedAt, Ulid Id)? cursor,

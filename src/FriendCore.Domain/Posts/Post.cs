@@ -81,6 +81,26 @@ public sealed class Post : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         return post;
     }
 
+    // §5.3 MVP: text and sensitivity are editable, but media and tags are fixed at creation.
+    // A text-only post cannot be edited down to nothing; an image-only post may have its
+    // (optional) caption cleared while keeping its media.
+    public ErrorOr<Success> Edit(string? content, ContentSensitivity sensitivity, DateTimeOffset updatedAt)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(content) ? null : content.Trim();
+
+        if (trimmed is null && Media.Count == 0)
+            return PostErrors.ContentOrMediaRequired;
+
+        if (trimmed?.Length > PostErrors.MaxContentLength)
+            return PostErrors.ContentTooLong;
+
+        Content = trimmed;
+        Sensitivity = sensitivity;
+        UpdatedAt = updatedAt;
+
+        return Result.Success;
+    }
+
     public void IncrementLikeCount() => LikeCount++;
 
     public void DecrementLikeCount()

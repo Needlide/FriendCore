@@ -173,6 +173,14 @@ public sealed class User : AggregateRoot<Ulid>, ISoftDeletable, IAuditable
         UpdatedAt = at;
     }
 
+    // Soft delete: the global query filter hides the account from logins and profile lookups,
+    // while rows and content stay intact for retention/audit purposes.
+    public void Delete(DateTimeOffset at)
+    {
+        DeletedAt = at;
+        UpdatedAt = at;
+    }
+
     public void AssignRole(UserRole role)
     {
         Role = role;

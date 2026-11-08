@@ -1,5 +1,6 @@
 using FriendCore.Application.Common.Interfaces;
 using FriendCore.Application.Moderation.Services;
+using FriendCore.Application.Notifications.Services;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
@@ -20,6 +21,7 @@ public class ModerationServiceTests
     private readonly IMessagingRepository _messagingRepository = Substitute.For<IMessagingRepository>();
     private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
     private readonly IAdminAuditLogRepository _auditLogRepository = Substitute.For<IAdminAuditLogRepository>();
+    private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly IDateTimeProvider _dateTimeProvider = Substitute.For<IDateTimeProvider>();
     private readonly Ulid _moderatorId = Ulid.NewUlid();
 
@@ -32,7 +34,7 @@ public class ModerationServiceTests
 
     private ModerationService CreateService() =>
         new(_currentUserService, _userRepository, _postRepository, _messagingRepository,
-            _mediaRepository, _auditLogRepository, _dateTimeProvider);
+            _mediaRepository, _auditLogRepository, _notificationService, _dateTimeProvider);
 
     private static Report PostReport(Ulid postId) =>
         Report.Create(Ulid.NewUlid(), ReportTargetType.Post, postId, ReportCategory.Spam, null, Now).Value;

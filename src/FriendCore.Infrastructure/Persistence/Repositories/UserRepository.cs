@@ -32,6 +32,30 @@ public sealed class UserRepository(AppDbContext context, IDomainEventDispatcher 
         return context.Users.FirstOrDefaultAsync(user => user.UsernameSlug == usernameSlug, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> SearchAsync(
+        string query,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = query.Trim().ToLowerInvariant();
+        if (limit <= 0 || normalized.Length == 0)
+            return [];
+
+        // Contains rather than EF.Functions.ILike: EF compiles it to a parameterised LIKE with
+        // the term's metacharacters escaped, so % and _ match literally (see ProviderQuirkGuardTests).
+        // UsernameSlug is stored lowercase; DisplayName needs an explicit lower for the comparison.
+        return await context.Users
+            .Where(user => !user.IsBanned
+                && (user.UsernameSlug.Contains(normalized)
+                    || user.DisplayName.ToLower().Contains(normalized)))
+            .OrderByDescending(user => user.UsernameSlug == normalized)
+            .ThenByDescending(user => user.UsernameSlug.StartsWith(normalized))
+            .ThenBy(user => user.UsernameSlug)
+            .Take(limit)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<User?> GetByUsernameSlugIgnoringBlocksAsync(
         string usernameSlug,
         CancellationToken cancellationToken = default)

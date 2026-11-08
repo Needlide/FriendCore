@@ -1,9 +1,11 @@
 using ErrorOr;
 using FriendCore.Application.Common.Interfaces;
+using FriendCore.Application.Notifications.Services;
 using FriendCore.Domain.Common;
 using FriendCore.Domain.Media;
 using FriendCore.Domain.Messaging;
 using FriendCore.Domain.Moderation;
+using FriendCore.Domain.Notifications;
 using FriendCore.Domain.Posts;
 using FriendCore.Domain.Users;
 
@@ -16,6 +18,7 @@ internal sealed class ModerationService(
     IMessagingRepository messagingRepository,
     IMediaRepository mediaRepository,
     IAdminAuditLogRepository auditLogRepository,
+    INotificationService notificationService,
     IDateTimeProvider dateTimeProvider)
     : IModerationService
 {
@@ -37,6 +40,7 @@ internal sealed class ModerationService(
         // apply the runtime enforcement as a tracked mutation — no save yet.
         ReportTargetType auditTargetType;
         Ulid auditTargetId;
+        Ulid? subjectUserId = null;
 
         switch (action)
         {
@@ -126,6 +130,7 @@ internal sealed class ModerationService(
                 // Warning / TemporaryRestriction / LegalReferral: recorded in the log only.
                 auditTargetType = ReportTargetType.User;
                 auditTargetId = subject.Id;
+                subjectUserId = subject.Id;
                 break;
 
             case ModerationActionType.ReportDismissed:
@@ -154,6 +159,31 @@ internal sealed class ModerationService(
         // The sole SaveChanges — commits the enforcement mutation, the report resolution, and the
         // audit entry together. No action can persist without its log.
         await auditLogRepository.AddAndSaveAsync(entry, cancellationToken);
+
+        // Notify after the save so a notification failure cannot roll moderation back (the service
+        // is best-effort and swallows failures anyway). The reported user is never told who
+        // reported them: report outcomes go to the reporter only.
+        if (report is not null)
+        {
+            await notificationService.CreateAsync(
+                report.ReporterId,
+                moderatorId,
+                NotificationType.ReportResolved,
+                report.Id,
+                now,
+                cancellationToken);
+        }
+        else if (subjectUserId is { } affectedUserId)
+        {
+            await notificationService.CreateAsync(
+                affectedUserId,
+                moderatorId,
+                NotificationType.ModerationAction,
+                entry.Id,
+                now,
+                cancellationToken);
+        }
+
         return Result.Success;
     }
 

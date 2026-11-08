@@ -203,4 +203,105 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task UpdatePost_Author_ChangesTextAndSensitivity_AndStampsUpdatedAt()
+    {
+        var (author, _) = await RegisterClient();
+        var postId = await CreatePost(author, "before");
+
+        var response = await author.PatchAsJsonAsync(
+            $"/api/v1/posts/{postId}",
+            new { content = "after", sensitivity = "Sensitive" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updated = await response.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.Equal("after", updated!.Content);
+        Assert.Equal("Sensitive", updated.Sensitivity);
+        Assert.True(updated.UpdatedAt >= updated.CreatedAt);
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_ReturnsForbidden()
+    {
+        var (author, _) = await RegisterClient();
+        var (other, _) = await RegisterClient();
+        var postId = await CreatePost(author);
+
+        var response = await other.PatchAsJsonAsync(
+            $"/api/v1/posts/{postId}",
+            new { content = "hijacked", sensitivity = "General" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_BlankingATextOnlyPost_ReturnsBadRequest()
+    {
+        var (author, _) = await RegisterClient();
+        var postId = await CreatePost(author, "cannot vanish");
+
+        var response = await author.PatchAsJsonAsync(
+            $"/api/v1/posts/{postId}",
+            new { content = "   ", sensitivity = "General" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateComment_Author_EditsText_AndStampsEditedAtOnce()
+    {
+        var (author, _) = await RegisterClient();
+        var postId = await CreatePost(author);
+        var add = await author.PostAsJsonAsync($"/api/v1/posts/{postId}/comments", new { content = "typo" });
+        var created = await add.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.Null(created!.EditedAt);
+
+        var first = await author.PatchAsJsonAsync(
+            $"/api/v1/comments/{created.Id}", new { content = "fixed" });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var edited = await first.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.Equal("fixed", edited!.Content);
+        var firstEditedAt = Assert.NotNull(edited.EditedAt);
+
+        // A second edit keeps the original "edited" instant.
+        var second = await author.PatchAsJsonAsync(
+            $"/api/v1/comments/{created.Id}", new { content = "fixed again" });
+        var twice = await second.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.Equal(firstEditedAt, twice!.EditedAt);
+    }
+
+    [Fact]
+    public async Task UpdateComment_NonAuthor_ReturnsForbidden()
+    {
+        var (author, _) = await RegisterClient();
+        var (other, _) = await RegisterClient();
+        var postId = await CreatePost(author);
+        var add = await author.PostAsJsonAsync($"/api/v1/posts/{postId}/comments", new { content = "mine" });
+        var comment = await add.Content.ReadFromJsonAsync<CommentResponse>();
+
+        var response = await other.PatchAsJsonAsync(
+            $"/api/v1/comments/{comment!.Id}", new { content = "not mine" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostAuthor_CanDeleteSomeoneElsesComment_AndCountDecrements()
+    {
+        var (author, _) = await RegisterClient();
+        var (commenter, _) = await RegisterClient();
+        var postId = await CreatePost(author);
+        var add = await commenter.PostAsJsonAsync(
+            $"/api/v1/posts/{postId}/comments", new { content = "off topic" });
+        var comment = await add.Content.ReadFromJsonAsync<CommentResponse>();
+
+        var delete = await author.DeleteAsync($"/api/v1/comments/{comment!.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+
+        var post = await author.GetFromJsonAsync<PostResponse>($"/api/v1/posts/{postId}");
+        Assert.Equal(0, post!.CommentCount);
+        var list = await author.GetFromJsonAsync<CommentFeedResponse>($"/api/v1/posts/{postId}/comments");
+        Assert.DoesNotContain(list!.Comments, c => c.Id == comment.Id);
+    }
 }
