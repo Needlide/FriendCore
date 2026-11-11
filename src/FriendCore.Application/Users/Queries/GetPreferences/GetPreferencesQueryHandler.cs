@@ -34,6 +34,7 @@ internal sealed class GetPreferencesQueryHandler : IRequestHandler<GetPreference
 
         return new PreferencesResponse(
             preferences.HideFlashingMedia,
+            preferences.HideIntenseMotionMedia,
             preferences.HideArachnidMedia,
             preferences.ReduceMotion,
             preferences.DisableAutoplay,

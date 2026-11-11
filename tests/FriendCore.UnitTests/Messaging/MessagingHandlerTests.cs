@@ -224,13 +224,13 @@ public class MessagingHandlerTests
         MediaReturns(media);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, null, media.Id), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, null, [media.Id]), CancellationToken.None);
 
         Assert.False(result.IsError);
         // Content stays null: no "Sent a file" placeholder standing in for real text.
         Assert.Null(result.Value.Content);
-        Assert.NotNull(result.Value.Media);
-        Assert.Equal(media.Id.ToString(), result.Value.Media!.Id);
+        Assert.Single(result.Value.Media);
+        Assert.Equal(media.Id.ToString(), result.Value.Media[0].Id);
     }
 
     [Fact]
@@ -241,11 +241,11 @@ public class MessagingHandlerTests
         MediaReturns(media);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, "look", media.Id), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, "look", [media.Id]), CancellationToken.None);
 
         Assert.False(result.IsError);
         Assert.Equal("look", result.Value.Content);
-        Assert.NotNull(result.Value.Media);
+        Assert.Single(result.Value.Media);
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class MessagingHandlerTests
             .Returns([]);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, "hi", mediaId), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, "hi", [mediaId]), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal("Media.NotFound", result.FirstError.Code);
@@ -272,7 +272,7 @@ public class MessagingHandlerTests
         MediaReturns(media);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, "hi", media.Id), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, "hi", [media.Id]), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal("Media.NotOwner", result.FirstError.Code);
@@ -289,7 +289,7 @@ public class MessagingHandlerTests
         MediaReturns(media);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, "hi", media.Id), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, "hi", [media.Id]), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal("Media.NotReady", result.FirstError.Code);
@@ -305,7 +305,7 @@ public class MessagingHandlerTests
             .Returns([media.Id]);
 
         var result = await SendHandler().Handle(
-            new SendMessageCommand(conversation.Id, "hi", media.Id), CancellationToken.None);
+            new SendMessageCommand(conversation.Id, "hi", [media.Id]), CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal("Media.AlreadyAttached", result.FirstError.Code);

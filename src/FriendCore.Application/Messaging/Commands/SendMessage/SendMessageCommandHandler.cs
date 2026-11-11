@@ -50,35 +50,52 @@ internal sealed class SendMessageCommandHandler(
             && await messagingRepository.GetMessageAsync(conversation.Id, replyToId, cancellationToken) is null)
             return MessagingErrors.ReplyTargetNotFound;
 
-        // Same gate the post path applies: the item must exist, belong to the sender, be
+        // Same gate the post path applies: every item must exist, belong to the sender, be
         // finished processing, and not already be spoken for. Reusing MediaItem wholesale
         // means DMs inherit the upload pipeline, variants, and safety flags unchanged.
-        var mediaError = await ValidateMediaAsync(request.MediaId, userId, cancellationToken);
-        if (mediaError is { } mediaFailure)
-            return mediaFailure;
+        var mediaIds = request.MediaIds ?? [];
+        if (mediaIds.Distinct().Count() != mediaIds.Count)
+            return MessagingErrors.DuplicateMedia;
+
+        var mediaValidation = await ValidateMediaAsync(mediaIds, userId, cancellationToken);
+        if (mediaValidation.IsError)
+            return mediaValidation.Errors;
+
+        var mediaItems = mediaValidation.Value;
 
         // Consent check, after ownership but before anything is written: the recipient deleted
-        // this exact image from this sender before, and that decision outranks a re-upload.
-        if (request.MediaId is { } refusalMediaId
+        // any of these exact images from this sender before, and that decision outranks a
+        // re-upload. All-or-nothing, like the rest of the attachment set.
+        if (mediaItems.Count > 0
             && conversation.OtherParticipantId(userId) is { } refusalRecipient)
         {
-            var media = await mediaRepository.GetByIdAsync(refusalMediaId, cancellationToken);
-            if (media?.ContentHash is { Length: > 0 } hash)
+            var hashes = mediaItems
+                .Select(media => media.ContentHash)
+                .Where(hash => !string.IsNullOrEmpty(hash))
+                .Select(hash => hash!)
+                .Distinct()
+                .ToList();
+
+            var refused = await mediaRepository.GetRefusedHashesAsync(
+                userId, refusalRecipient, hashes, cancellationToken);
+
+            if (refused.Count > 0)
             {
-                var refused = await mediaRepository.GetRefusedHashesAsync(
-                    userId, refusalRecipient, [hash], cancellationToken);
-                if (refused.Count > 0)
+                // Best-effort and per-image: only the refused uploads are deleted, so a sender
+                // can remove the declined one and retry the rest without re-uploading them.
+                var refusedSet = refused.ToHashSet(StringComparer.Ordinal);
+                foreach (var media in mediaItems.Where(
+                             media => media.ContentHash is { } hash && refusedSet.Contains(hash)))
                 {
-                    // Best-effort: the upload is unattached and would otherwise be orphaned for
-                    // ever, and a sender who keeps retrying would accumulate them without bound.
-                    await TryDiscardRefusedUploadAsync(refusalMediaId);
-                    return MediaErrors.RefusedByRecipient;
+                    await TryDiscardRefusedUploadAsync(media.Id);
                 }
+
+                return MediaErrors.RefusedByRecipient;
             }
         }
 
         var messageResult = Message.Create(
-            conversation.Id, userId, request.Content, now, request.MediaId, request.ReplyToMessageId);
+            conversation.Id, userId, request.Content, now, mediaIds, request.ReplyToMessageId);
         if (messageResult.IsError)
             return messageResult.Errors;
 
@@ -106,10 +123,8 @@ internal sealed class SendMessageCommandHandler(
         return response;
     }
 
-    // Mirrors CreatePost's media gate, so an item that failed there cannot slip through here.
-    // Returns null when there is no attachment to check.
     /// <summary>
-    ///     Deletes the upload a refused send left behind. Best-effort by design: a refusal must
+    ///     Deletes an upload a refused send left behind. Best-effort by design: a refusal must
     ///     never fail because the cleanup did, and a leftover orphan is a storage cost rather
     ///     than a correctness problem.
     /// </summary>
@@ -125,28 +140,33 @@ internal sealed class SendMessageCommandHandler(
         }
     }
 
-    private async Task<Error?> ValidateMediaAsync(
-        Ulid? mediaId,
+    // Mirrors CreatePost's media gate, so an item that failed there cannot slip through here.
+    // Returns an empty list when there is no attachment to check.
+    private async Task<ErrorOr<List<MediaItem>>> ValidateMediaAsync(
+        IReadOnlyList<Ulid> mediaIds,
         Ulid userId,
         CancellationToken cancellationToken)
     {
-        if (mediaId is not { } id)
-            return null;
+        if (mediaIds.Count == 0)
+            return new List<MediaItem>();
 
-        var items = await mediaRepository.GetByIdsAsync([id], cancellationToken);
-        var media = items.FirstOrDefault();
+        var items = await mediaRepository.GetByIdsAsync(mediaIds, cancellationToken);
 
-        if (media is null)
+        // All-or-nothing: a partial match would silently send fewer images than requested.
+        if (items.Count != mediaIds.Count)
             return MediaErrors.NotFound;
 
-        if (media.UploaderId != userId)
+        if (items.Any(media => media.UploaderId != userId))
             return MediaErrors.NotOwner;
 
-        if (!media.IsReady)
+        if (items.Any(media => !media.IsReady))
             return MediaErrors.NotReady;
 
         // Union across posts AND messages: an upload is attachable exactly once, anywhere.
-        var attached = await mediaRepository.GetAttachedIdsAsync([id], cancellationToken);
-        return attached.Count > 0 ? MediaErrors.AlreadyAttached : null;
+        var attached = await mediaRepository.GetAttachedIdsAsync(mediaIds, cancellationToken);
+        if (attached.Count > 0)
+            return MediaErrors.AlreadyAttached;
+
+        return items.ToList();
     }
 }

@@ -49,32 +49,31 @@ internal sealed class MediaResponseFactory(
     }
 
     /// <summary>Per-message media for a page of the thread. One lookup for the whole page.</summary>
-    public async Task<IReadOnlyDictionary<Ulid, MediaResponse>> ForMessagesAsync(
+    public async Task<IReadOnlyDictionary<Ulid, IReadOnlyList<MediaResponse>>> ForMessagesAsync(
         IReadOnlyCollection<Message> messages,
         CancellationToken cancellationToken)
     {
         var mediaIds = messages
-            .Where(message => message.MediaItemId is not null)
-            .Select(message => message.MediaItemId!.Value)
+            .SelectMany(message => message.Media)
+            .Select(messageMedia => messageMedia.MediaItemId)
             .Distinct()
             .ToList();
 
         if (mediaIds.Count == 0)
-            return new Dictionary<Ulid, MediaResponse>();
+            return new Dictionary<Ulid, IReadOnlyList<MediaResponse>>();
 
         var mediaById = await LoadAsync(mediaIds, cancellationToken);
 
-        var result = new Dictionary<Ulid, MediaResponse>();
-        foreach (var message in messages)
-        {
-            if (message.MediaItemId is not { } id) continue;
-            // A soft-deleted media item leaves the bubble without an image rather than
-            // failing the whole page.
-            if (mediaById.TryGetValue(id, out var media))
-                result[message.Id] = MediaResponse.Create(media, _publicBaseUrl);
-        }
-
-        return result;
+        return messages.ToDictionary(
+            message => message.Id,
+            message => (IReadOnlyList<MediaResponse>)message.Media
+                .OrderBy(messageMedia => messageMedia.DisplayOrder)
+                .Select(messageMedia => mediaById.GetValueOrDefault(messageMedia.MediaItemId))
+                // A soft-deleted media item leaves the bubble without that image rather than
+                // failing the whole page. With several images the rest still render.
+                .Where(media => media is not null)
+                .Select(media => MediaResponse.Create(media!, _publicBaseUrl))
+                .ToList());
     }
 
     private async Task<Dictionary<Ulid, MediaItem>> LoadAsync(

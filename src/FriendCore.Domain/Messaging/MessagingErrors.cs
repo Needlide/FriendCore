@@ -28,6 +28,15 @@ public static class MessagingErrors
         Error.Validation("Messaging.MessageTooLong",
             $"Message must not exceed {Message.MaxContentLength} characters.");
 
+    // Four matches a post's limit: the same visual grid, and the same client-side total-size
+    // budget. Kept as a domain invariant so a future caller cannot invent a fifth slot.
+    public static Error TooManyMedia =>
+        Error.Validation("Messaging.TooManyMedia",
+            $"A message can have at most {Message.MaxMediaPerMessage} images.");
+
+    public static Error DuplicateMedia =>
+        Error.Validation("Messaging.DuplicateMedia", "The same image cannot be attached twice.");
+
     // 404: the message is not in this conversation, or was soft-deleted (the global query
     // filter makes it invisible), so both cases are indistinguishable to the caller.
     /// <summary>

@@ -19,9 +19,9 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
     private Task<(HttpClient Client, string Username)> RegisterClient() =>
         new AuthScenarios(factory).RegisterVerifiedClientAsync();
 
-    private static async Task<string> UploadReadyMedia(HttpClient client, bool flashing = false)
+    private static async Task<string> UploadReadyMedia(HttpClient client, bool flashing = false, int width = 200)
     {
-        var file = new ByteArrayContent(TestImages.RealPng(200, 100));
+        var file = new ByteArrayContent(TestImages.RealPng(width, 100));
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         var form = new MultipartFormDataContent
         {
@@ -61,11 +61,11 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
         var message = await sent.Content.ReadFromJsonAsync<MessageResponse>();
         // No "Sent a file" placeholder: the bubble renders from Media or not at all.
         Assert.Null(message!.Content);
-        Assert.NotNull(message.Media);
-        Assert.Equal(mediaId, message.Media!.Id);
-        Assert.DoesNotContain(message.Media.Variants, v => v.Type == "Original");
-        Assert.Equal(4, message.Media.Variants.Count);
-        var medium = message.Media.Variants.Single(v => v.Type == "Medium");
+        var image = Assert.Single(message.Media);
+        Assert.Equal(mediaId, image.Id);
+        Assert.DoesNotContain(image.Variants, v => v.Type == "Original");
+        Assert.Equal(4, image.Variants.Count);
+        var medium = image.Variants.Single(v => v.Type == "Medium");
         Assert.EndsWith($"uploads/variants/{mediaId}/medium.webp", medium.Url);
         Assert.StartsWith("http", medium.Url);
 
@@ -74,7 +74,7 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
             $"/api/v1/conversations/{conversation.Id}/messages");
         var echoed = thread!.Messages.Single();
         Assert.Null(echoed.Content);
-        Assert.Equal(mediaId, echoed.Media!.Id);
+        Assert.Equal(mediaId, Assert.Single(echoed.Media).Id);
     }
 
     [Fact]
@@ -91,7 +91,84 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
 
         Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
         Assert.Equal("look", message!.Content);
-        Assert.Equal(mediaId, message.Media!.Id);
+        Assert.Equal(mediaId, Assert.Single(message.Media).Id);
+    }
+
+    [Fact]
+    public async Task SendFourImages_PreservesDisplayOrder_AndAllComeBack()
+    {
+        var (alice, _) = await RegisterClient();
+        var (_, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+
+        // Distinct dimensions keep the PNG bytes distinct, so nothing here depends on one
+        // upload deduplicating against another.
+        var mediaIds = new List<string>();
+        for (var index = 0; index < 4; index++)
+            mediaIds.Add(await UploadReadyMedia(alice, width: 200 + index));
+
+        var sent = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages",
+            new { content = "album", mediaIds });
+        Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
+
+        var message = (await sent.Content.ReadFromJsonAsync<MessageResponse>())!;
+        Assert.Equal(mediaIds, message.Media.Select(image => image.Id));
+
+        // The read path groups the junction rows by message and keeps display order.
+        var thread = await alice.GetFromJsonAsync<MessageFeedResponse>(
+            $"/api/v1/conversations/{conversation.Id}/messages");
+        Assert.Equal(mediaIds, thread!.Messages.Single().Media.Select(image => image.Id));
+    }
+
+    [Fact]
+    public async Task MoreThanFourImages_ReturnsBadRequest()
+    {
+        var (alice, _) = await RegisterClient();
+        var (_, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+
+        var mediaIds = new List<string>();
+        for (var index = 0; index < 5; index++)
+            mediaIds.Add(await UploadReadyMedia(alice, width: 220 + index));
+
+        var response = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages", new { mediaIds });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TheSameImageTwice_ReturnsBadRequest()
+    {
+        var (alice, _) = await RegisterClient();
+        var (_, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+        var mediaId = await UploadReadyMedia(alice);
+
+        var response = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages",
+            new { mediaIds = new[] { mediaId, mediaId } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OneForeignImage_RefusesTheWholeSet_RatherThanDroppingIt()
+    {
+        var (alice, _) = await RegisterClient();
+        var (bob, bobName) = await RegisterClient();
+        var conversation = await StartConversation(alice, bobName);
+
+        var alicesImage = await UploadReadyMedia(alice);
+        var bobsImage = await UploadReadyMedia(bob, width: 240);
+
+        var response = await alice.PostAsJsonAsync(
+            $"/api/v1/conversations/{conversation.Id}/messages",
+            new { content = "mine and theirs", mediaIds = new[] { alicesImage, bobsImage } });
+
+        // All-or-nothing: a 201 here would silently send only the first image.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -107,7 +184,7 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
 
         Assert.Equal(HttpStatusCode.Created, sent.StatusCode);
         Assert.Equal("just text", message!.Content);
-        Assert.Null(message.Media);
+        Assert.Empty(message.Media);
     }
 
     [Fact]
@@ -245,9 +322,10 @@ public class MessageMediaFlowTests(FriendCoreApiFactory factory) : IClassFixture
         // not matter which client renders the bubble.
         var feed = await bob.GetFromJsonAsync<MessageFeedResponse>(
             $"/api/v1/conversations/{conversation.Id}/messages");
-        var bubble = feed!.Messages.Single(m => m.Media?.Id == mediaId);
-        Assert.Empty(bubble.Media!.Variants);
-        Assert.True(bubble.Media.SafetyFlags["flashing"]);
+        var bubble = feed!.Messages.Single(m => m.Media.Any(image => image.Id == mediaId));
+        var gated = bubble.Media.Single(image => image.Id == mediaId);
+        Assert.Empty(gated.Variants);
+        Assert.True(gated.SafetyFlags["flashing"]);
 
         // Consent, from a conversation participant, succeeds.
         var reveal = await bob.PostAsync($"/api/v1/media/{mediaId}/reveal", content: null);

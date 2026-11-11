@@ -31,6 +31,7 @@ internal sealed class UpdatePreferencesCommandHandler(
         user.SetContentPreference(MapContentPreference(request.ContentPreference), now);
         preferences.UpdateAccessibility(
             request.HideFlashingMedia,
+            request.HideIntenseMotionMedia,
             request.HideArachnidMedia,
             request.ReduceMotion,
             request.DisableAutoplay,

@@ -14,7 +14,7 @@ public sealed record MessageResponse(
     string? Content,
     string Status,
     DateTimeOffset CreatedAt,
-    MediaResponse? Media,
+    IReadOnlyList<MediaResponse> Media,
     DateTimeOffset? EditedAt = null,
     IReadOnlyList<ReactionResponse>? Reactions = null,
     int Version = 0,
@@ -22,7 +22,7 @@ public sealed record MessageResponse(
 {
     public static MessageResponse Create(
         Message message,
-        MediaResponse? media = null,
+        IReadOnlyList<MediaResponse>? media = null,
         IReadOnlyList<ReactionResponse>? reactions = null,
         MessageReferenceResponse? replyTo = null) =>
         new(
@@ -32,7 +32,9 @@ public sealed record MessageResponse(
             message.Content,
             message.Status.ToString(),
             message.CreatedAt,
-            media,
+            // Normalized to an empty list, never null: a text-only message is the common case,
+            // and the client should not have to branch on "no images" versus "field absent".
+            media ?? [],
             message.EditedAt,
             // Normalized to an empty list, never null: a message with no reactions is the common
             // case, and this record doubles as the realtime payload for MessageReceived and

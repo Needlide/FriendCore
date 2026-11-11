@@ -89,9 +89,13 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
         Ulid messageId,
         CancellationToken cancellationToken = default)
     {
-        return context.Messages.FirstOrDefaultAsync(
-            message => message.Id == messageId && message.ConversationId == conversationId,
-            cancellationToken);
+        return context.Messages
+            // The edit response and the refusal path both read the images, and a loaded message
+            // without them would look like a text-only bubble after an edit.
+            .Include(message => message.Media)
+            .FirstOrDefaultAsync(
+                message => message.Id == messageId && message.ConversationId == conversationId,
+                cancellationToken);
     }
 
     public async Task SoftDeleteAsync(
@@ -148,9 +152,10 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
         // clean these up and they would sit on the row as unreachable orphans.
         await RemoveReactionsForMessageAsync(message.Id, cancellationToken);
 
-        var refusal = await BuildRefusalAsync(message, source, deletedAt, cancellationToken);
-        if (refusal is not null)
-            context.MediaRefusals.Add(refusal);
+        // One refusal per image: deleting a four-image message must not stop the other three from
+        // coming back with a re-upload.
+        context.MediaRefusals.AddRange(
+            await BuildRefusalsAsync(message, source, deletedAt, cancellationToken));
     }
 
     /// <summary>
@@ -170,14 +175,26 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
     ///         <see cref="MessageDeletionSource" /> rather than being re-derived at each call site.
     ///     </para>
     /// </remarks>
-    private async Task<MediaRefusal?> BuildRefusalAsync(
+    private async Task<IReadOnlyList<MediaRefusal>> BuildRefusalsAsync(
         Message message,
         MessageDeletionSource source,
         DateTimeOffset at,
         CancellationToken cancellationToken)
     {
-        if (source == MessageDeletionSource.Sender || message.MediaItemId is not { } mediaItemId)
-            return null;
+        if (source == MessageDeletionSource.Sender)
+            return [];
+
+        // Read the junction rather than the navigation: hide/delete callers load the message
+        // without Include, and a refusal derived from an empty collection would let a deleted
+        // image come straight back.
+        var mediaItemIds = await context.MessageMedia
+            .Where(link => link.MessageId == message.Id)
+            .Select(link => link.MediaItemId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (mediaItemIds.Count == 0)
+            return [];
 
         // The recipient is whoever this conversation is with. Resolved from the conversation
         // rather than passed in, so it cannot disagree with the message it is deleting.
@@ -189,20 +206,20 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
 
         var recipientId = conversation?.OtherParticipantId(message.SenderId);
         if (recipientId is null)
-            return null;
+            return [];
 
         // A media item that predates the ContentHash column has no hash, and refusing an empty
         // string would be worse than not refusing: it would match nothing, but it would also mean
         // this code had silently started pretending to check.
-        var hash = await context.MediaItems
-            .Where(media => media.Id == mediaItemId)
+        var hashes = await context.MediaItems
+            .Where(media => mediaItemIds.Contains(media.Id))
             .Select(media => media.ContentHash)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (string.IsNullOrEmpty(hash))
-            return null;
-
-        return MediaRefusal.Create(hash, recipientId.Value, message.SenderId, at);
+        return hashes
+            .Where(hash => !string.IsNullOrEmpty(hash))
+            .Select(hash => MediaRefusal.Create(hash!, recipientId.Value, message.SenderId, at))
+            .ToList();
     }
 
     /// <summary>
@@ -239,9 +256,8 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
 
         if (message is not null)
         {
-            var refusal = await BuildRefusalAsync(message, source, at, cancellationToken);
-            if (refusal is not null)
-                context.MediaRefusals.Add(refusal);
+            context.MediaRefusals.AddRange(
+                await BuildRefusalsAsync(message, source, at, cancellationToken));
         }
 
         await context.SaveChangesAsync(cancellationToken);
@@ -286,6 +302,7 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
                 (message.CreatedAt == before.CreatedAt && message.Id.CompareTo(before.Id) < 0));
 
         return await query
+            .Include(message => message.Media)
             .OrderByDescending(message => message.CreatedAt)
             .ThenByDescending(message => message.Id)
             .Take(limit)
@@ -308,6 +325,7 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
                               && message.Content.ToLower().Contains(needle)
                               && !context.MessageHidden.Any(hidden =>
                                   hidden.MessageId == message.Id && hidden.UserId == viewerId))
+            .Include(message => message.Media)
             .OrderByDescending(message => message.CreatedAt)
             .ThenByDescending(message => message.Id)
             .Take(limit)
@@ -345,8 +363,9 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
                               && !context.MessageHidden.Any(hidden =>
                                   hidden.MessageId == message.Id && hidden.UserId == viewerId));
 
-        var target = await visible.FirstOrDefaultAsync(
-            message => message.Id == messageId, cancellationToken);
+        var target = await visible
+            .Include(message => message.Media)
+            .FirstOrDefaultAsync(message => message.Id == messageId, cancellationToken);
         if (target is null)
             return MessageWindow.Empty;
 
@@ -356,6 +375,7 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
         // other list. The target itself is excluded by the strict inequality on the timestamp.
         var older = await visible
             .Where(message => message.CreatedAt < at || (message.CreatedAt == at && message.Id != target.Id))
+            .Include(message => message.Media)
             .OrderByDescending(message => message.CreatedAt)
             .ThenByDescending(message => message.Id)
             .Take(radius + 1)
@@ -364,6 +384,7 @@ public sealed class MessagingRepository(AppDbContext context) : IMessagingReposi
 
         var newer = await visible
             .Where(message => message.CreatedAt > at)
+            .Include(message => message.Media)
             .OrderBy(message => message.CreatedAt)
             .ThenBy(message => message.Id)
             .Take(radius + 1)

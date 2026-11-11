@@ -10,7 +10,8 @@ public sealed class SendMessageCommandValidator : AbstractValidator<SendMessageC
         // "At least one of text or media" is enforced twice on purpose: here for the
         // request shape, and again in Message.Create for callers that bypass MediatR.
         RuleFor(command => command.Content)
-            .Must((command, content) => !string.IsNullOrWhiteSpace(content) || command.MediaId is not null)
+            .Must((command, content) =>
+                !string.IsNullOrWhiteSpace(content) || command.MediaIds is { Count: > 0 })
             .WithErrorCode("Messaging.MessageEmpty")
             .WithMessage("A message needs text or an attachment.")
             .DependentRules(() =>

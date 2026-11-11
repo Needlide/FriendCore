@@ -83,12 +83,12 @@ public class MessagingDomainTests
     {
         var mediaId = Ulid.NewUlid();
 
-        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), content, Now, mediaId);
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), content, Now, [mediaId]);
 
         Assert.False(result.IsError);
         // Whitespace next to an attachment is noise, not a caption.
         Assert.Null(result.Value.Content);
-        Assert.Equal(mediaId, result.Value.MediaItemId);
+        Assert.Equal(mediaId, result.Value.Media.Single().MediaItemId);
     }
 
     [Fact]
@@ -96,11 +96,11 @@ public class MessagingDomainTests
     {
         var mediaId = Ulid.NewUlid();
 
-        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "look at this", Now, mediaId);
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "look at this", Now, [mediaId]);
 
         Assert.False(result.IsError);
         Assert.Equal("look at this", result.Value.Content);
-        Assert.Equal(mediaId, result.Value.MediaItemId);
+        Assert.Equal(mediaId, result.Value.Media.Single().MediaItemId);
     }
 
     [Fact]
@@ -109,7 +109,41 @@ public class MessagingDomainTests
         var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "hi", Now);
 
         Assert.False(result.IsError);
-        Assert.Null(result.Value.MediaItemId);
+        Assert.Empty(result.Value.Media);
+    }
+
+    [Fact]
+    public void Message_Create_PreservesMediaOrder()
+    {
+        var mediaIds = new[] { Ulid.NewUlid(), Ulid.NewUlid(), Ulid.NewUlid() };
+
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), "album", Now, mediaIds);
+
+        Assert.False(result.IsError);
+        Assert.Equal(mediaIds, result.Value.Media.Select(link => link.MediaItemId));
+        Assert.Equal([0, 1, 2], result.Value.Media.Select(link => link.DisplayOrder));
+    }
+
+    [Fact]
+    public void Message_Create_RejectsMoreThanFourImages()
+    {
+        var mediaIds = Enumerable.Range(0, Message.MaxMediaPerMessage + 1)
+            .Select(_ => Ulid.NewUlid())
+            .ToList();
+
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), null, Now, mediaIds);
+
+        Assert.Equal("Messaging.TooManyMedia", result.FirstError.Code);
+    }
+
+    [Fact]
+    public void Message_Create_RejectsTheSameImageTwice()
+    {
+        var mediaId = Ulid.NewUlid();
+
+        var result = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), null, Now, [mediaId, mediaId]);
+
+        Assert.Equal("Messaging.DuplicateMedia", result.FirstError.Code);
     }
 
     [Fact]
@@ -187,7 +221,7 @@ public class MessagingDomainTests
     [Fact]
     public void Message_Edit_RefusesAnAttachmentOnlyMessage()
     {
-        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), null, Now, Ulid.NewUlid()).Value;
+        var message = Message.Create(Ulid.NewUlid(), Ulid.NewUlid(), null, Now, [Ulid.NewUlid()]).Value;
 
         var result = message.Edit("a caption I never typed", Now);
 

@@ -318,7 +318,7 @@ public class MessageEditAndDeleteHandlerTests
     public async Task Edit_RejectsAnAttachmentOnlyMessage()
     {
         var mediaId = Ulid.NewUlid();
-        var image = Message.Create(_conversationId, _senderId, null, Now, mediaId).Value;
+        var image = Message.Create(_conversationId, _senderId, null, Now, [mediaId]).Value;
         _messagingRepository.GetMessageAsync(_conversationId, _messageId, Arg.Any<CancellationToken>())
             .Returns(image);
 
@@ -334,7 +334,7 @@ public class MessageEditAndDeleteHandlerTests
     public async Task Edit_AllowsRetitlingAMessageThatHadBothTextAndAnImage()
     {
         var mediaId = Ulid.NewUlid();
-        var captioned = Message.Create(_conversationId, _senderId, "look", Now, mediaId).Value;
+        var captioned = Message.Create(_conversationId, _senderId, "look", Now, [mediaId]).Value;
         _messagingRepository.GetMessageAsync(_conversationId, _messageId, Arg.Any<CancellationToken>())
             .Returns(captioned);
 

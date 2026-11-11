@@ -7,6 +7,7 @@ namespace FriendCore.Application.Users.Commands.UpdatePreferences;
 /// <summary>Full replace of the accessibility settings and content preference (§17.2).</summary>
 public sealed record UpdatePreferencesCommand(
     bool HideFlashingMedia,
+    bool HideIntenseMotionMedia,
     bool HideArachnidMedia,
     bool ReduceMotion,
     bool DisableAutoplay,

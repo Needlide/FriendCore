@@ -183,10 +183,6 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_encrypted");
 
-                    b.Property<string>("MediaItemId")
-                        .HasColumnType("text")
-                        .HasColumnName("media_item_id");
-
                     b.Property<string>("ReplyToMessageId")
                         .HasColumnType("text")
                         .HasColumnName("reply_to_message_id");
@@ -209,9 +205,6 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnName("version");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("MediaItemId")
-                        .HasFilter("media_item_id IS NOT NULL");
 
                     b.HasIndex("ReplyToMessageId")
                         .HasFilter("reply_to_message_id IS NOT NULL");
@@ -241,6 +234,28 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "MessageId");
 
                     b.ToTable("message_hidden", (string)null);
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.MessageMedia", b =>
+                {
+                    b.Property<string>("MessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("MediaItemId")
+                        .HasColumnType("text")
+                        .HasColumnName("media_item_id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.HasKey("MessageId", "MediaItemId");
+
+                    b.HasIndex("MediaItemId")
+                        .IsUnique();
+
+                    b.ToTable("message_media", (string)null);
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Messaging.MessageReaction", b =>
@@ -1026,6 +1041,10 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("hide_flashing_media");
 
+                    b.Property<bool>("HideIntenseMotionMedia")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hide_intense_motion_media");
+
                     b.PrimitiveCollection<string[]>("KeywordFilters")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -1134,6 +1153,15 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.MessageMedia", b =>
+                {
+                    b.HasOne("FriendCore.Domain.Messaging.Message", null)
+                        .WithMany("Media")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Posts.Post", b =>
@@ -1246,6 +1274,11 @@ namespace FriendCore.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("ProfileTags");
+                });
+
+            modelBuilder.Entity("FriendCore.Domain.Messaging.Message", b =>
+                {
+                    b.Navigation("Media");
                 });
 
             modelBuilder.Entity("FriendCore.Domain.Posts.Post", b =>

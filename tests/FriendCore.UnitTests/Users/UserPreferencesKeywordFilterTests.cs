@@ -128,11 +128,12 @@ public class UserPreferencesKeywordFilterTests
         // The two settings are stored together but describe different things; splitting the
         // mutators keeps a future edit to one from silently clearing the other.
         var preferences = UserPreferences.CreateDefault(Ulid.NewUlid(), Now);
-        preferences.UpdateAccessibility(false, true, true, false, true, Now);
+        preferences.UpdateAccessibility(false, true, true, true, false, true, Now);
 
         preferences.UpdateComposer(false, Now.AddMinutes(1));
 
         Assert.False(preferences.HideFlashingMedia);
+        Assert.True(preferences.HideIntenseMotionMedia);
         Assert.True(preferences.HideArachnidMedia);
         Assert.True(preferences.ReduceMotion);
         Assert.False(preferences.DisableAutoplay);

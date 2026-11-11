@@ -19,6 +19,7 @@ public sealed class UserPreferencesConfiguration : IEntityTypeConfiguration<User
                 value => Ulid.Parse(value));
 
         builder.Property(preferences => preferences.HideFlashingMedia).HasColumnName("hide_flashing_media");
+        builder.Property(preferences => preferences.HideIntenseMotionMedia).HasColumnName("hide_intense_motion_media");
         builder.Property(preferences => preferences.HideArachnidMedia).HasColumnName("hide_arachnid_media");
         builder.Property(preferences => preferences.ReduceMotion).HasColumnName("reduce_motion");
         builder.Property(preferences => preferences.DisableAutoplay).HasColumnName("disable_autoplay");

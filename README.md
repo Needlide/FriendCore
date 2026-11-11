@@ -31,7 +31,7 @@ two SignalR hubs for push updates, and optionally serves the built Angular SPA.
 | **Realtime** | SignalR — notifications and messaging hubs |
 | **Media** | S3-compatible storage, ImageSharp WebP variants, background processing |
 | **Moderation** | Reports, enforcement ladder, appeals, audit log, admin metrics |
-| **Tests** | 522 unit · 393 integration · 8 architecture (923 total) |
+| **Tests** | 525 unit · 398 integration · 8 architecture (931 total) |
 | **Deployment** | Heroku preview today; Docker/Caddy/systemd files included for self-hosting |
 
 ## Feature map
@@ -96,8 +96,8 @@ dotnet test tests/FriendCore.IntegrationTests   # requires Docker
 
 | Suite | Count | Notes |
 |---|---:|---|
-| Unit | 522 | Handlers, validators, domain rules, services |
-| Integration | 393 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client |
+| Unit | 525 | Handlers, validators, domain rules, services |
+| Integration | 398 | Real PostgreSQL and MinIO via Testcontainers, `WebApplicationFactory`, SignalR client |
 | Architecture | 8 | Enforces layer boundaries and naming rules |
 
 CI (`.github/workflows/ci.yml`) runs architecture + unit tests on every push and

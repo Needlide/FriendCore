@@ -23,6 +23,15 @@ public sealed class UserPreferences
 
     /// <summary>
     ///     True (the default) makes the client ask before showing media flagged with the
+    ///     intense-motion hazard. Opt-out like <see cref="HideFlashingMedia" />: switching it
+    ///     off is a deliberate "show me anyway", so the client can auto-reveal. Kept separate
+    ///     from flashing because a motion-sensitive reader is not necessarily photosensitive —
+    ///     and both default on, so the protective behaviour is unchanged until someone opts out.
+    /// </summary>
+    public bool HideIntenseMotionMedia { get; private set; } = true;
+
+    /// <summary>
+    ///     True (the default) makes the client ask before showing media flagged with the
     ///     arachnophobia hazard. Opt-out, like <see cref="HideFlashingMedia" />: switching it
     ///     off is a deliberate "show me anyway", so the client can auto-reveal.
     /// </summary>
@@ -53,6 +62,7 @@ public sealed class UserPreferences
 
     public void UpdateAccessibility(
         bool hideFlashingMedia,
+        bool hideIntenseMotionMedia,
         bool hideArachnidMedia,
         bool reduceMotion,
         bool disableAutoplay,
@@ -60,6 +70,7 @@ public sealed class UserPreferences
         DateTimeOffset now)
     {
         HideFlashingMedia = hideFlashingMedia;
+        HideIntenseMotionMedia = hideIntenseMotionMedia;
         HideArachnidMedia = hideArachnidMedia;
         ReduceMotion = reduceMotion;
         DisableAutoplay = disableAutoplay;

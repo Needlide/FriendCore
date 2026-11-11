@@ -40,6 +40,8 @@ public class GetPreferencesQueryHandlerTests
 
         Assert.False(result.IsError);
         Assert.Equal(_preferences.HideFlashingMedia, result.Value.HideFlashingMedia);
+        Assert.Equal(_preferences.HideIntenseMotionMedia, result.Value.HideIntenseMotionMedia);
+        Assert.True(result.Value.HideIntenseMotionMedia);
         Assert.Equal("General", result.Value.ContentPreference);
     }
 }

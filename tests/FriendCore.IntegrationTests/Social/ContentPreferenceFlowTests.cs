@@ -28,6 +28,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         return client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideIntenseMotionMedia = true,
             hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
@@ -48,7 +49,36 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         var body = await response.Content.ReadFromJsonAsync<PreferencesResponse>();
         Assert.Equal("Explicit", body!.ContentPreference);
         Assert.True(body.HideFlashingMedia);
+        Assert.True(body.HideIntenseMotionMedia);
         Assert.False(body.ReduceMotion);
+    }
+
+    [Fact]
+    public async Task HideIntenseMotionMedia_DefaultsOn_AndRoundTripsIndependentlyOfFlashing()
+    {
+        var (client, _) = await RegisterClient();
+
+        var initial = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.True(initial!.HideIntenseMotionMedia);
+
+        // Turning motion off must not turn flashing off with it: a motion-sensitive reader is
+        // not necessarily photosensitive, and vice versa.
+        var patched = await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
+        {
+            hideFlashingMedia = true,
+            hideIntenseMotionMedia = false,
+            hideArachnidMedia = true,
+            reduceMotion = false,
+            disableAutoplay = true,
+            reduceVisualNoise = false,
+            sendMessageOnEnter = true,
+            contentPreference = "General"
+        });
+        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+
+        var after = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
+        Assert.False(after!.HideIntenseMotionMedia);
+        Assert.True(after.HideFlashingMedia);
     }
 
     [Fact]
@@ -58,6 +88,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
 
         var initial = await client.GetFromJsonAsync<PreferencesResponse>("/api/v1/users/me/preferences");
         Assert.True(initial!.HideFlashingMedia);
+        Assert.True(initial.HideIntenseMotionMedia);
         Assert.True(initial.HideArachnidMedia);
         Assert.Equal("General", initial.ContentPreference);
 
@@ -156,6 +187,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         var patched = await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideIntenseMotionMedia = true,
             hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
@@ -179,6 +211,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideIntenseMotionMedia = true,
             hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,
@@ -192,6 +225,7 @@ public class ContentPreferenceFlowTests(FriendCoreApiFactory factory) : IClassFi
         await client.PatchAsJsonAsync("/api/v1/users/me/preferences", new
         {
             hideFlashingMedia = true,
+            hideIntenseMotionMedia = true,
             hideArachnidMedia = true,
             reduceMotion = false,
             disableAutoplay = true,

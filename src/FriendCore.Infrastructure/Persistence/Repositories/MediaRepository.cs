@@ -42,22 +42,16 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
             .Select(link => link.MediaItemId)
             .ToListAsync(cancellationToken);
 
-        // Message.MediaItemId is a NULLABLE Ulid, and Npgsql cannot build the ANY(...)
-        // parameter for a Ulid?[] — it hunts for a JSON array mapping and throws before
-        // the query ever runs. Per-id equality is a plain indexed compare with a scalar
-        // parameter, which the conversion handles fine. A message carries at most one
-        // attachment and a post at most a handful, so this stays a handful of lookups.
-        var inMessages = new List<Ulid>();
-        foreach (var id in ids)
-        {
-            if (await context.Messages.AnyAsync(
-                    message => message.MediaItemId == (Ulid?)id, cancellationToken))
-                inMessages.Add(id);
-        }
+        // The message junction is a plain Ulid column, so ANY(...) works here unlike the old
+        // nullable messages.media_item_id. Counting the link row (not the message) also keeps
+        // soft-deleted messages' images spoken for, which is what stops a re-upload of the same
+        // media being attached to a new message.
+        var inMessages = await context.MessageMedia
+            .Where(link => ids.Contains(link.MediaItemId))
+            .Select(link => link.MediaItemId)
+            .ToListAsync(cancellationToken);
 
-        // Union across both link tables, and soft-deleted owners still count: a deleted
-        // post's media stays in the table, so treating it as free would let the same
-        // upload be re-attached while the old row still references it.
+        // Union across both link tables.
         return inPosts.Concat(inMessages).Distinct().ToList();
     }
 
@@ -98,11 +92,16 @@ public sealed class MediaRepository(AppDbContext context) : IMediaRepository
         if (postId != Ulid.Empty)
             return new MediaAttachment(postId, null, null);
 
-        // Message.MediaItemId is a nullable Ulid, which Npgsql cannot use in an ANY(...) array —
-        // the same trap documented on GetAttachedIdsAsync. Plain equality on a scalar avoids it.
-        var message = await context.Messages
-            .Where(m => m.MediaItemId == mediaId)
-            .Select(m => new { m.Id, m.ConversationId })
+        // The message junction is a plain Ulid column, so ANY(...) is safe here. The join to
+        // messages keeps the soft-delete filter: an image whose message was erased is no longer
+        // revealable through the attachment path.
+        var message = await context.MessageMedia
+            .Where(link => link.MediaItemId == mediaId)
+            .Join(
+                context.Messages,
+                link => link.MessageId,
+                candidate => candidate.Id,
+                (link, candidate) => new { candidate.Id, candidate.ConversationId })
             .FirstOrDefaultAsync(cancellationToken);
 
         return message is null

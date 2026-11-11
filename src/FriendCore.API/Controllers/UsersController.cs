@@ -226,6 +226,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
         var result = await sender.Send(
             new UpdatePreferencesCommand(
                 request.HideFlashingMedia,
+                request.HideIntenseMotionMedia,
                 request.HideArachnidMedia,
                 request.ReduceMotion,
                 request.DisableAutoplay,

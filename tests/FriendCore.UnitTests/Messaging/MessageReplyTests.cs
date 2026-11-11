@@ -68,7 +68,7 @@ public class MessageReplyTests
         var parent = Create("here is the thing");
         var mediaId = Ulid.NewUlid();
 
-        var reply = Message.Create(_conversationId, _authorId, null, Now, mediaId, parent.Id).Value;
+        var reply = Message.Create(_conversationId, _authorId, null, Now, [mediaId], parent.Id).Value;
 
         Assert.Equal(parent.Id, reply.ReplyToMessageId);
         Assert.Null(reply.Content);
@@ -133,7 +133,7 @@ public class MessageReplyTests
     public void Reference_DoesNotCallAnAttachmentOnlyParentDeleted()
     {
         var mediaId = Ulid.NewUlid();
-        var parent = Message.Create(_conversationId, _authorId, null, Now, mediaId).Value;
+        var parent = Message.Create(_conversationId, _authorId, null, Now, [mediaId]).Value;
 
         var reference = MessageReference.From(parent);
 

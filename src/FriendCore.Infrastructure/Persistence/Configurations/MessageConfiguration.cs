@@ -28,15 +28,6 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("content")
             .HasMaxLength(Message.MaxContentLength);
 
-        // Nullable: a message may carry only an attachment. Existing rows are all text,
-        // so the ALTER needs no backfill. The explicit text store type matters — left to
-        // inference, the nullable conversion makes Npgsql map the column as a JSON
-        // collection, which only surfaces when the column is used in an ANY(...) query.
-        builder.Property(message => message.MediaItemId)
-            .HasColumnName("media_item_id")
-            .HasColumnType("text")
-            .HasConversion(id => id == null ? null : id.ToString(), value => value == null ? null : Ulid.Parse(value));
-
         builder.Property(message => message.IsEncrypted).HasColumnName("is_encrypted");
 
         builder.Property(message => message.Status)
@@ -57,8 +48,7 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasDefaultValue(0);
 
         // Nullable, and no FK — matching the module's deliberate absence of referential
-        // constraints. The same value-conversion treatment as media_item_id, for the same
-        // Npgsql reason: an explicit text column, because an inferred nullable Ulid conversion
+        // constraints. An explicit text column, because an inferred nullable Ulid conversion
         // gets mapped as a JSON collection and breaks inside ANY(...).
         builder.Property(message => message.ReplyToMessageId)
             .HasColumnName("reply_to_message_id")
@@ -77,9 +67,12 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         builder.HasIndex(message => new { message.ConversationId, message.CreatedAt, message.Id })
             .HasFilter("deleted_at IS NULL");
 
-        // Serves the "is this upload already attached?" probe. Partial, because a
-        // text-only message has a null here and never needs the index.
-        builder.HasIndex(message => message.MediaItemId)
-            .HasFilter("media_item_id IS NOT NULL");
+        // Auto-included from the field so a loaded message always knows its images; the
+        // junction table itself is mapped by MessageMediaConfiguration.
+        builder.HasMany(message => message.Media)
+            .WithOne()
+            .HasForeignKey(messageMedia => messageMedia.MessageId);
+
+        builder.Navigation(message => message.Media).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

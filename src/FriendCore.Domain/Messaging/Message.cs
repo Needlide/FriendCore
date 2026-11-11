@@ -6,6 +6,9 @@ namespace FriendCore.Domain.Messaging;
 public sealed class Message : Entity<Ulid>, ISoftDeletable
 {
     public const int MaxContentLength = 5000;
+    public const int MaxMediaPerMessage = 4;
+
+    private readonly List<MessageMedia> _media = [];
 
     private Message(Ulid id, DateTimeOffset createdAt)
         : base(id, createdAt)
@@ -25,10 +28,10 @@ public sealed class Message : Entity<Ulid>, ISoftDeletable
     // searchable, translatable, and quoted back in a report, none of which the user wrote.
     public string? Content { get; private set; }
 
-    // At most one attachment, not a PostMedia-style junction: a chat bubble shows one
-    // image, and the extra table would buy nothing until a second slot is actually
-    // designed. PostMedia is the template if that day comes.
-    public Ulid? MediaItemId { get; private set; }
+    // Up to four images in sender-chosen order, via the MessageMedia junction. The junction is
+    // the PostMedia template: a message and its images are separate rows, and display order is
+    // stored rather than inferred from ids.
+    public IReadOnlyList<MessageMedia> Media => _media.AsReadOnly();
 
     // MVP is plaintext at rest (§5.6); E2EE is deferred (§15.2). The column exists so the
     // contract is stable when encryption lands.
@@ -77,30 +80,42 @@ public sealed class Message : Entity<Ulid>, ISoftDeletable
         Ulid senderId,
         string? content,
         DateTimeOffset createdAt,
-        Ulid? mediaItemId = null,
+        IReadOnlyList<Ulid>? mediaIds = null,
         Ulid? replyToMessageId = null)
     {
         var trimmed = content?.Trim();
-        var hasMedia = mediaItemId is not null;
+        var media = mediaIds ?? [];
 
         // At least one of the two, checked after trimming so "   " counts as empty.
-        if (string.IsNullOrWhiteSpace(trimmed) && !hasMedia)
+        if (string.IsNullOrWhiteSpace(trimmed) && media.Count == 0)
             return MessagingErrors.MessageEmpty;
 
         if (trimmed is { Length: > MaxContentLength })
             return MessagingErrors.MessageTooLong;
 
-        return new Message(Ulid.NewUlid(), createdAt)
+        if (media.Count > MaxMediaPerMessage)
+            return MessagingErrors.TooManyMedia;
+
+        if (media.Distinct().Count() != media.Count)
+            return MessagingErrors.DuplicateMedia;
+
+        var id = Ulid.NewUlid();
+        var message = new Message(id, createdAt)
         {
             ConversationId = conversationId,
             SenderId = senderId,
             // Whitespace-only alongside an attachment is noise, not a caption.
             Content = string.IsNullOrWhiteSpace(trimmed) ? null : trimmed,
-            MediaItemId = mediaItemId,
             ReplyToMessageId = replyToMessageId,
             IsEncrypted = false,
             Status = MessageStatus.Sent
         };
+
+        // DisplayOrder follows the order the client sent the ids in.
+        for (var order = 0; order < media.Count; order++)
+            message._media.Add(MessageMedia.Create(id, media[order], order));
+
+        return message;
     }
 
     /// <summary>
@@ -128,7 +143,7 @@ public sealed class Message : Entity<Ulid>, ISoftDeletable
 
         // Refuse the whole operation for an attachment-only message rather than letting a
         // caption appear on a bubble the sender never captioned.
-        if (MediaItemId is not null && Content is null)
+        if (Media.Count > 0 && Content is null)
             return MessagingErrors.MessageNotEditable;
 
         var trimmed = content?.Trim();

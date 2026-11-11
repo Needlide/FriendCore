@@ -98,10 +98,24 @@ public sealed class MessagingController(ISender sender) : ControllerBase
             return NotFound();
 
         // A supplied-but-unparseable media id is a client bug, not an absent attachment.
-        // Silently coercing it to null would turn a request for an image into a
-        // successful TEXT-ONLY message — the caller would see 201 and never know the
-        // picture was dropped.
-        Ulid? mediaId = null;
+        // Silently coercing it away would turn a request for an image into a successful
+        // TEXT-ONLY message — the caller would see 201 and never know the picture was dropped.
+        var mediaIds = new List<Ulid>();
+        foreach (var raw in request.MediaIds ?? [])
+        {
+            if (!Ulid.TryParse(raw, out var parsed))
+                return BadRequest(new
+                {
+                    errors = new Dictionary<string, string[]>
+                    {
+                        [nameof(request.MediaIds)] = ["A media id is not a valid id."]
+                    }
+                });
+            mediaIds.Add(parsed);
+        }
+
+        // Legacy single-image alias. Appended rather than replacing, and skipped when already
+        // present so a transitional client sending both does not trip the duplicate check.
         if (request.MediaId is { Length: > 0 })
         {
             if (!Ulid.TryParse(request.MediaId, out var parsed))
@@ -112,7 +126,9 @@ public sealed class MessagingController(ISender sender) : ControllerBase
                         [nameof(request.MediaId)] = ["Media id is not a valid id."]
                     }
                 });
-            mediaId = parsed;
+
+            if (!mediaIds.Contains(parsed))
+                mediaIds.Add(parsed);
         }
 
         // Same reasoning as a malformed media id: a supplied-but-unparseable reply target is a
@@ -128,7 +144,7 @@ public sealed class MessagingController(ISender sender) : ControllerBase
         }
 
         var result = await sender.Send(
-            new SendMessageCommand(conversationId, request.Content, mediaId, replyToId), cancellationToken);
+            new SendMessageCommand(conversationId, request.Content, mediaIds, replyToId), cancellationToken);
         return result.ToCreatedResult();
     }
 

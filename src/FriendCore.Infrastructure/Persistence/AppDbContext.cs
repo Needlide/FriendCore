@@ -42,6 +42,7 @@ public class AppDbContext(
     public DbSet<MediaRefusal> MediaRefusals => Set<MediaRefusal>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageMedia> MessageMedia => Set<MessageMedia>();
     public DbSet<MessageHidden> MessageHidden => Set<MessageHidden>();
     public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
     public DbSet<Notification> Notifications => Set<Notification>();
