@@ -268,7 +268,11 @@ public class PostInteractionFlowTests(FriendCoreApiFactory factory) : IClassFixt
         var second = await author.PatchAsJsonAsync(
             $"/api/v1/comments/{created.Id}", new { content = "fixed again" });
         var twice = await second.Content.ReadFromJsonAsync<CommentResponse>();
-        Assert.Equal(firstEditedAt, twice!.EditedAt);
+        var secondEditedAt = Assert.NotNull(twice!.EditedAt);
+
+        // Postgres stores timestamptz to the microsecond, while the first response can still
+        // carry the in-memory 100 ns tick value. Compare at the precision the column keeps.
+        Assert.Equal(firstEditedAt.UtcTicks / 10, secondEditedAt.UtcTicks / 10);
     }
 
     [Fact]

@@ -373,7 +373,7 @@ public class NotificationFlowTests(FriendCoreApiFactory factory) : IClassFixture
 
         var resolved = await moderator.PostAsJsonAsync(
             $"/api/v1/admin/reports/{report.Id}/resolve",
-            new { action = "ReportDismissed", reason = "no violation" });
+            new { action = "Dismiss", reason = "no violation" });
         Assert.Equal(HttpStatusCode.NoContent, resolved.StatusCode);
 
         var notification = Assert.Single((await GetNotifications(reporter)).Notifications);
